@@ -56,6 +56,22 @@ class AttackScreenLocations @Inject constructor(
     fun supportCheckRegion(card: CommandCard.Face) =
         affinityRegion(card) + Location(-50, 100)
 
+    /**
+     * Portrait area of each of the three fixed NP cards.
+     *
+     * The values are expressed in FGA's 2560x1440 script space. The existing scaling layer
+     * maps them to the 1280x720 comparison image, so device pixels are never hard-coded here.
+     * The supplied CN reference was captured on a 2736x1264 display; it is used only to locate
+     * these regions.
+     */
+    fun npServantMatchRegion(np: CommandCard.NP) = when (np) {
+        CommandCard.NP.A -> Region(-640, 100, 400, 360)
+        CommandCard.NP.B -> Region(-190, 100, 400, 360)
+        CommandCard.NP.C -> Region(270, 100, 420, 360)
+    }.xFromCenter()
+
+    fun npSupportCheckRegion(np: CommandCard.NP) = npServantMatchRegion(np)
+
     val backClick =
         (if (isWide)
             Location(-325, 1310)

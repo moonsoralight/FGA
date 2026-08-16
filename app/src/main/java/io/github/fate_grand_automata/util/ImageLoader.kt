@@ -13,9 +13,16 @@ import io.github.fate_grand_automata.scripts.enums.MaterialEnum
 import io.github.fate_grand_automata.scripts.prefs.IPreferences
 import io.github.lib_automata.ColorManager
 import io.github.lib_automata.Pattern
+import io.github.lib_automata.Size
 import org.opencv.android.Utils
 import org.opencv.imgcodecs.Imgcodecs
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Point
+import org.opencv.core.Scalar
+import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 class ImageLoader @Inject constructor(
     val storageProvider: IStorageProvider,
@@ -83,6 +90,8 @@ class ImageLoader @Inject constructor(
     }
 
     private var supportCachedPatterns = mutableMapOf<CacheKey, List<Pattern>>()
+    private var questCachedPatterns = mutableMapOf<CacheKey, Pattern>()
+    private var dreamFireMarkerPatterns: List<Pattern>? = null
 
     override fun clearSupportCache() = synchronized(supportCachedPatterns) {
         for (patterns in supportCachedPatterns.values) {
@@ -90,6 +99,14 @@ class ImageLoader @Inject constructor(
         }
 
         supportCachedPatterns.clear()
+
+        for (pattern in questCachedPatterns.values) {
+            pattern.close()
+        }
+        questCachedPatterns.clear()
+
+        dreamFireMarkerPatterns?.forEach { it.close() }
+        dreamFireMarkerPatterns = null
     }
 
     private fun fileLoader(kind: SupportImageKind, name: String): List<Pattern> {
@@ -117,6 +134,58 @@ class ImageLoader @Inject constructor(
                 tag = "MAT:$material"
             )
         }
+
+    override fun loadQuestPattern(
+        name: String,
+        deviceToCompareScale: Double
+    ): Pattern = synchronized(questCachedPatterns) {
+        // access/ crops come from the same device that is currently running the script. Use the
+        // exact scale of that script's live screenshot pipeline instead of independently deriving
+        // it from display metrics. This keeps user templates and live screenshots pixel-aligned on
+        // devices whose physical, logical, game-render, or MediaProjection sizes differ.
+        val normalizedScale = deviceToCompareScale.takeIf { it.isFinite() && it > 0.0 } ?: 1.0
+        questCachedPatterns.getOrPut(key("quest:$name@$normalizedScale")) {
+            val source = storageProvider.readQuestImage(name).use {
+                DroidCvPattern(it, false, "ACCESS:$name")
+            }
+
+            if (normalizedScale == 1.0) {
+                source
+            } else {
+                val normalizedSize = Size(
+                    (source.width * normalizedScale).roundToInt().coerceAtLeast(1),
+                    (source.height * normalizedScale).roundToInt().coerceAtLeast(1)
+                )
+                source.resize(normalizedSize).also { source.close() }
+            }
+        }
+    }
+
+    override fun loadDreamFireMarkerPatterns(): List<Pattern> {
+        dreamFireMarkerPatterns?.let { return it }
+
+        fun baseMarker(): Mat {
+            val mat = Mat.zeros(52, 52, CvType.CV_8UC1)
+            val white = Scalar(255.0)
+            val top = arrayOf(Point(26.0, 3.0), Point(42.0, 18.0), Point(26.0, 33.0), Point(10.0, 18.0), Point(26.0, 3.0))
+            val bottom = arrayOf(Point(26.0, 19.0), Point(42.0, 34.0), Point(26.0, 49.0), Point(10.0, 34.0), Point(26.0, 19.0))
+            Imgproc.polylines(mat, listOf(org.opencv.core.MatOfPoint(*top)), false, white, 4)
+            Imgproc.polylines(mat, listOf(org.opencv.core.MatOfPoint(*bottom)), false, white, 4)
+            return mat
+        }
+
+        val source = baseMarker()
+        val frames = (0 until 8).map { frame ->
+            val output = Mat.zeros(source.size(), source.type())
+            val rotation = Imgproc.getRotationMatrix2D(Point(26.0, 26.0), frame * 22.5, 1.0)
+            Imgproc.warpAffine(source, output, rotation, source.size())
+            rotation.release()
+            DroidCvPattern(output, tag = "DREAM-FIRE-MARKER:$frame")
+        }
+        source.release()
+        dreamFireMarkerPatterns = frames
+        return frames
+    }
 }
 
 class SupportImageNotFoundException(kind: SupportImageKind, name: String) : 

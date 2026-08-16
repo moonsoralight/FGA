@@ -116,6 +116,23 @@ class BattleScreenLocations @Inject constructor(
     fun imageRegion(skill: Skill.Servant) =
         Region(22, 28, 30, 30) + locate(skill)
 
+    /** OCR area for the current enemy count shown in the upper-right battle HUD. */
+    val enemyCountRegion = Region(-760, 78, 700, 105).xFromRight()
+
+    /** OCR area for one active servant's NP percentage in the lower battle HUD. */
+    fun npPercentRegion(slot: FieldSlot): Region {
+        val centerX = locate(slot.skill2()).x
+        return Region(centerX - 125, 1235, 250, 105)
+    }
+
+    fun servantNameRegion(slot: FieldSlot): Region {
+        val centerX = locate(slot.skill2()).x
+        return Region(centerX - 220, 1300, 440, 75)
+    }
+
+    val energyInsufficientTextRegion = Region(-600, 540, 1200, 220).xFromCenter()
+    val energyInsufficientCloseRegion = Region(-360, 1000, 720, 240).xFromCenter()
+
     val servantDetailsInfoClick = Location(-660, 110).xFromCenter()
     
     val servantDetailsFaceCardRegion = Region(-685, 410, 110, 60).xFromCenter()

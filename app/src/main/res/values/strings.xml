@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">FGA (Debug)</string>
+    <string name="app_name" translatable="false">FGA PR2196 Extended</string>
 
     <string name="game_server_na" translatable="false">NA</string>
     <string name="game_server_jp" translatable="false">JP</string>

@@ -24,6 +24,12 @@ interface IPreferences {
     val screenshotDrops: Boolean
     val screenshotDropsUnmodified: Boolean
     val screenshotBond: Boolean
+    val autoDreamFireEnabled: Boolean
+    val dreamFireTestMode: Boolean
+    val dreamFireBondWaitSeconds: Int
+    val dreamFireLevel1Image: String
+    val dreamFireLevel2Image: String
+    val dreamFireHasMap: Boolean
     var hidePlayButton: Boolean
     val hideSQInAPResources: Boolean
 

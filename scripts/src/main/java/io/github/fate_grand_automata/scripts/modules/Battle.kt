@@ -24,7 +24,8 @@ class Battle @Inject constructor(
     private val skillSpam: SkillSpam,
     private val shuffleChecker: ShuffleChecker,
     private val stageTracker: StageTracker,
-    private val autoChooseTarget: AutoChooseTarget
+    private val autoChooseTarget: AutoChooseTarget,
+    private val hakunoShuffle: HakunoShuffle
 ) : IFgoAutomataApi by api {
     init {
         prefs.stopAfterThisRun = false
@@ -79,7 +80,10 @@ class Battle @Inject constructor(
         val npUsage = autoSkill.execute(state.stage, state.turn)
         skillSpam.spamSkills()
 
-        val cards = clickAttack()
+        val cards = (hakunoShuffle.shuffleUntilMatched(
+            readCards = ::clickAttack,
+            closeAttack = { locations.attack.backClick.click() }
+        ) ?: clickAttack())
             .takeUnless { shouldShuffle(it, npUsage) }
             ?: shuffleCards()
 

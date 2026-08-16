@@ -14,6 +14,8 @@ import io.github.fate_grand_automata.scripts.enums.ShuffleCardsEnum
 import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
+import io.github.fate_grand_automata.scripts.models.MasterSpamConfig
+import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
 
 class BattleConfigCore(
     val id: String,
@@ -94,6 +96,15 @@ class BattleConfigCore(
     val shuffleCards = maker.enum("shuffle_cards", ShuffleCardsEnum.None)
     val shuffleCardsWave = maker.int("shuffle_cards_wave", 3)
 
+    val hakunoShuffleEnabled = maker.bool("hakuno_shuffle_enabled")
+    val hakunoShuffleAutoDetect = maker.bool("hakuno_shuffle_auto_detect", true)
+    val hakunoShuffleManualSlot = maker.int("hakuno_shuffle_manual_slot", 1)
+    val hakunoShuffleWaves = maker.stringSet("hakuno_shuffle_waves").map(
+        defaultValue = (1..3).toSet(),
+        convert = { values -> values.mapNotNull { it.toIntOrNull() }.filter { it in 1..3 }.toSet() },
+        reverse = { values -> values.map { it.toString() }.toSet() }
+    )
+
     val useServantPriority = maker.bool("use_servant_priority")
     val servantPriority = maker.serialized(
         "servant_priority",
@@ -130,6 +141,21 @@ class BattleConfigCore(
                 gson.toJson(value)
         },
         defaultSpamConfig
+    )
+
+    val masterSpam = maker.serialized(
+        "master_spam",
+        serializer = object : Serializer<MasterSpamConfig> {
+            override fun deserialize(serialized: String) =
+                try {
+                    gson.fromJson(serialized, MasterSpamConfig::class.java) ?: MasterSpamConfig()
+                } catch (e: JsonSyntaxException) {
+                    MasterSpamConfig()
+                }
+
+            override fun serialize(value: MasterSpamConfig) = gson.toJson(value)
+        },
+        MasterSpamConfig()
     )
 
     val party = maker.stringAsInt("autoskill_party", -1)
@@ -189,4 +215,17 @@ class BattleConfigCore(
     val addRaidTurnDelay = maker.bool("add_raid_delay")
 
     val raidTurnDelaySeconds = maker.stringAsInt("raid_delay_seconds", 3)
+
+    val customCardSelection = maker.serialized(
+        "custom_card_selection",
+        serializer = object : Serializer<CustomCardSelectionPerTurn> {
+            override fun deserialize(serialized: String) =
+                CustomCardSelectionPerTurn.of(serialized)
+
+            override fun serialize(value: CustomCardSelectionPerTurn) =
+                value.toString()
+        },
+        default = CustomCardSelectionPerTurn.empty
+    )
+
 }

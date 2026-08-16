@@ -9,7 +9,10 @@ import javax.inject.Inject
 class SupportSelectionGrandChecker @Inject constructor(
     api: IFgoAutomataApi
 ): IFgoAutomataApi by api {
-    fun isGrandPresent(region: Region): Boolean {
-        return region.exists(images[Images.GrandCeLabel])
+    fun isGrandPresent(
+        region: Region,
+        image: Images = Images.GrandCeLabel
+    ): Boolean {
+        return region.exists(images[image])
     }
 }

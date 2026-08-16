@@ -15,6 +15,10 @@ interface IStorageProvider {
 
     fun list(kind: SupportImageKind): List<String>
 
+    fun readQuestImage(name: String): InputStream
+
+    fun listQuestImages(): List<String>
+
     fun dropScreenshot(patterns: List<Pattern>)
 
     fun dropBondScreenShot(pattern: Pattern, server: GameServer = GameServer.default)

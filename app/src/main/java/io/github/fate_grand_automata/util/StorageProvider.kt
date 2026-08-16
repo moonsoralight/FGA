@@ -92,6 +92,25 @@ class StorageProvider @Inject constructor(
         }
     }
 
+    // Kept under the existing API name for import compatibility; user-managed entrance images
+    // now live in access/, alongside support/.
+    private val questImageFolder
+        get() = dirRoot.getOrCreateDir("access")
+
+    override fun readQuestImage(name: String): InputStream {
+        val file = questImageFolder.findFile(name)
+            ?: questImageFolder.findFile(name.removeSuffix(".png") + ".png")
+            ?: throw IllegalStateException("Quest image not found: $name")
+        return resolver.openInputStream(file.uri)
+            ?: throw IllegalStateException("Unable to read quest image: $name")
+    }
+
+    override fun listQuestImages(): List<String> = questImageFolder
+        .listFiles()
+        .mapNotNull { it.name }
+        .filter { it.endsWith(".png", ignoreCase = true) }
+        .sortedWith(String.CASE_INSENSITIVE_ORDER)
+
     private val supportFolderName = "support"
 
     val shouldExtractSupportImages

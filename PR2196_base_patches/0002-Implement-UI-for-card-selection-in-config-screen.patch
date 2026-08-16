@@ -1,0 +1,830 @@
+From 54689f6fb0f43fd94adb5b0d12ced0b858329f65 Mon Sep 17 00:00:00 2001
+From: sheng-28 <lishengsheng28@gmail.com>
+Date: Thu, 12 Mar 2026 17:09:39 +1100
+Subject: [PATCH 2/5] Implement UI for card selection in config screen
+
+---
+ .../di/script/PreferencesModule.kt            |   4 +-
+ .../battle_config_item/BattleConfigScreen.kt  |  90 +++++++-
+ .../BattleConfigScreenViewModel.kt            |   6 +-
+ .../CustomCardSelectionScreen.kt              |  13 ++
+ .../CustomCardSelectionTurnItem.kt            | 211 ++++++++++++++++++
+ .../CustomCardSelectionTurnSelector.kt        |  99 ++++++++
+ .../CustomCardSelectionView.kt                |  64 ++++++
+ .../CustomCardSelectionViewModel.kt           |  43 ++++
+ .../fate_grand_automata/ui/main/FgaApp.kt     |  10 +-
+ .../fate_grand_automata/prefs/BattleConfig.kt |   4 +-
+ .../prefs/core/BattleConfigCore.kt            |  26 +--
+ .../scripts/models/CustomCard.kt              |  12 +-
+ .../scripts/models/CustomCardSelection.kt     |   2 +-
+ .../models/CustomCardSelectionPerTurn.kt      |   2 +-
+ .../scripts/prefs/IBattleConfig.kt            |   4 +-
+ 15 files changed, 559 insertions(+), 31 deletions(-)
+ create mode 100644 app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionScreen.kt
+ create mode 100644 app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+ create mode 100644 app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnSelector.kt
+ create mode 100644 app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt
+ create mode 100644 app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionViewModel.kt
+
+diff --git a/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt b/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt
+index df2c4b2f58e83d7c04b5d7e1837c30e0297508a4..c64927aeff18a568741093fedac4df40d0f013b6 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt
+@@ -55,6 +55,6 @@ class PreferencesModule {
+     @ScriptScope
+     @Provides
+     fun provideCustomCardSelection(battleConfig: IBattleConfig): CustomCardSelectionPerTurn =
+-        CustomCardSelectionPerTurn.of(battleConfig.customCardSelectionRaw)
+-//    todo:replace String config after UI implementation
++        battleConfig.customCardSelection
++
+ }
+\ No newline at end of file
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+index 0d6d5ca3db6935d5b6c638e75ef8deb407c3fc78..c4ddd26e0a3a5dfff3d6bb873928733b57f890dd 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+@@ -33,14 +33,18 @@ import androidx.compose.ui.res.colorResource
+ import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.SpanStyle
+ import androidx.compose.ui.text.buildAnnotatedString
++import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.withStyle
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.viewmodel.compose.viewModel
+ import io.github.fate_grand_automata.R
+ import io.github.fate_grand_automata.prefs.core.BattleConfigCore
++import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
+ import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.CardScore
++import io.github.fate_grand_automata.scripts.models.CustomCard
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ import io.github.fate_grand_automata.ui.Heading
+ import io.github.fate_grand_automata.ui.HeadingButton
+ import io.github.fate_grand_automata.ui.VerticalDivider
+@@ -80,6 +84,7 @@ fun BattleConfigScreen(
+ sealed class BattleConfigDestination {
+     object SkillMaker : BattleConfigDestination()
+     object CardPriority : BattleConfigDestination()
++    object CustomCardSelection : BattleConfigDestination()
+     object Spam : BattleConfigDestination()
+     object PreferredSupport : BattleConfigDestination()
+     object Back : BattleConfigDestination()
+@@ -160,10 +165,6 @@ private fun BattleConfigContent(
+                             config.notes.EditTextPreference(
+                                 title = stringResource(R.string.p_battle_config_notes)
+                             )
+-                            // todo: remove this after UI implementation
+-                            config.customCardSelectionRaw.EditTextPreference(
+-                                title = "Custom Card Selection"
+-                            )
+                         }
+                     }
+                 }
+@@ -249,6 +250,18 @@ private fun BattleConfigContent(
+                                     onClick = { navigate(BattleConfigDestination.CardPriority) }
+                                 )
+                             }
++
++                            HorizontalDivider()
++
++                            val customCardSelection by vm.customCardSelection.collectAsState(CustomCardSelectionPerTurn.empty)
++                            
++                            customCardSelection?.let {
++                                Preference(
++                                    title = { Text("Custom Card Selection") },
++                                    summary = { CustomCardSelectionSummary(it) },
++                                    onClick = { navigate(BattleConfigDestination.CustomCardSelection) }
++                                )
++                            }
+                         }
+                     }
+                 }
+@@ -276,6 +289,73 @@ private val CardScore.color: Color
+         return colorResource(getColorRes())
+     }
+ 
++private val CustomCard.color: Color
++    @Composable get() {
++        val colorRes = when (type) {
++            CardTypeEnum.Buster -> R.color.colorBuster
++            CardTypeEnum.Arts -> R.color.colorArts
++            CardTypeEnum.Quick -> R.color.colorQuick
++            else -> R.color.colorAccent
++        }
++        return colorResource(colorRes)
++    }
++
++@Composable
++private fun CustomCardSelectionSummary(customCardSelection: CustomCardSelectionPerTurn) {
++    if (customCardSelection.isEmpty()) {
++        Text("Not Set")
++        return
++    }
++
++    Column(
++        modifier = Modifier
++            .padding(vertical = 5.dp)
++    ) {
++        customCardSelection.forEachIndexed { turn, selection ->
++            if (selection.isNotEmpty()) {
++                Row(
++                    modifier = Modifier
++                        .padding(vertical = 2.dp),
++                    verticalAlignment = Alignment.CenterVertically
++                ) {
++                    Text(
++                        "T${turn + 1}: ",
++                        modifier = Modifier
++                            .padding(end = 16.dp),
++                        style = MaterialTheme.typography.bodyMedium
++                    )
++
++                    Card(
++                        colors = CardDefaults.cardColors(
++                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
++                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
++                        )
++                    ) {
++                        Row(
++                            modifier = Modifier.padding(horizontal = 5.dp)
++                        ) {
++                            selection.forEachIndexed { index, it ->
++                                if (index != 0) {
++                                    Text(
++                                        ", ",
++                                        style = MaterialTheme.typography.bodyMedium
++                                    )
++                                }
++                                Text (
++                                    text = it.toString(),
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    color = it.color,
++                                    fontWeight = FontWeight.Bold,
++                                )
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
+ @Composable
+ private fun CardPrioritySummary(cardPriority: CardPriorityPerWave) {
+     Column(
+@@ -349,4 +429,4 @@ private fun CardPrioritySummary(cardPriority: CardPriorityPerWave) {
+             }
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreenViewModel.kt b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreenViewModel.kt
+index 2f1f292d59c5464b4999cb3e45cde88b035c6b34..25e471a4ef0db91dc7e3f95e29ffd8ed29d3f819 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreenViewModel.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreenViewModel.kt
+@@ -29,6 +29,10 @@ class BattleConfigScreenViewModel @Inject constructor(
+         battleConfigCore.cardPriority
+             .asFlow()
+ 
++    val customCardSelection =
++        battleConfigCore.customCardSelection
++            .asFlow()
++
+     val skillCommand =
+         battleConfigCore.skillCommand
+             .asFlow()
+@@ -92,4 +96,4 @@ class BattleConfigScreenViewModel @Inject constructor(
+     fun delete() {
+         prefs.removeBattleConfig(battleConfig.id)
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionScreen.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionScreen.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..11a01cd445f926055c40f15475537f0ca0fde6df
+--- /dev/null
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionScreen.kt
+@@ -0,0 +1,13 @@
++package io.github.fate_grand_automata.ui.custom_card_selection
++
++import androidx.compose.runtime.Composable
++import androidx.lifecycle.viewmodel.compose.viewModel
++
++@Composable
++fun CustomCardSelectionScreen(
++    vm: CustomCardSelectionViewModel = viewModel()
++) {
++    CustomCardSelectionView(
++        vm = vm
++    )
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..69dc938667a8782377deff1dacd94d89fca69d9b
+--- /dev/null
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+@@ -0,0 +1,211 @@
++package io.github.fate_grand_automata.ui.custom_card_selection
++
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.offset
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.Close
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Surface
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.res.colorResource
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.window.Dialog
++import io.github.fate_grand_automata.R
++import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
++import io.github.fate_grand_automata.scripts.models.CustomCard
++import io.github.fate_grand_automata.scripts.models.CustomCardSelection
++import io.github.fate_grand_automata.scripts.models.FieldSlot
++
++@Composable
++fun CustomCardSelectionTurnItem(
++    selection: CustomCardSelection,
++    onSelectionChange: (CustomCardSelection) -> Unit
++) {
++    var showPicker by remember { mutableStateOf(false) }
++
++    if (showPicker) {
++        CardPicker(
++            onDismiss = { showPicker = false },
++            onSelected = {
++                val newList = selection.toList() + it
++                onSelectionChange(CustomCardSelection(newList))
++            }
++        )
++    }
++
++    Column(
++        modifier = Modifier
++            .fillMaxWidth()
++            .padding(16.dp),
++        horizontalAlignment = Alignment.CenterHorizontally
++    ) {
++        Row(
++            verticalAlignment = Alignment.CenterVertically,
++            horizontalArrangement = Arrangement.Center,
++            modifier = Modifier.fillMaxWidth()
++        ) {
++            selection.forEachIndexed { index, card ->
++                SelectedCardItem(
++                    card = card,
++                    onRemove = {
++                        val newList = selection.toMutableList()
++                        newList.removeAt(index)
++                        onSelectionChange(CustomCardSelection(newList))
++                    }
++                )
++            }
++            if (selection.size < 3) {
++                Surface(
++                    tonalElevation = 5.dp,
++                    shape = MaterialTheme.shapes.medium,
++                    color = MaterialTheme.colorScheme.surfaceVariant,
++                    modifier = Modifier
++                        .padding(5.dp)
++                        .size(50.dp),
++                    onClick = { showPicker = true }
++                ) {
++                    Box(contentAlignment = Alignment.Center) {
++                        Icon(
++                            Icons.Default.Add,
++                            contentDescription = "Add"
++                        )
++                    }
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun CardPicker(
++    onDismiss: () -> Unit,
++    onSelected: (CustomCard) -> Unit
++) {
++    Dialog(onDismissRequest = onDismiss) {
++        Surface(
++            shape = MaterialTheme.shapes.medium,
++            color = MaterialTheme.colorScheme.surface,
++            tonalElevation = 8.dp
++        ) {
++            Column(
++                modifier = Modifier.padding(16.dp),
++                horizontalAlignment = Alignment.CenterHorizontally
++            ) {
++                Text(
++                    "Select Command Card",
++                    style = MaterialTheme.typography.titleMedium,
++                    modifier = Modifier.padding(bottom = 16.dp)
++                )
++
++                val types = listOf(CardTypeEnum.Buster, CardTypeEnum.Arts, CardTypeEnum.Quick)
++                Row(
++                    modifier = Modifier.padding(vertical = 4.dp),
++                    horizontalArrangement = Arrangement.spacedBy(4.dp),
++                    verticalAlignment = Alignment.CenterVertically
++                ) {
++                    FieldSlot.list.forEach { slot ->
++                        Text(
++                            "S${slot.position}",
++                            style = MaterialTheme.typography.labelLarge,
++                            modifier = Modifier.padding(horizontal = 4.dp)
++                        )
++                        types.forEach { type ->
++                            val color = when (type) {
++                                CardTypeEnum.Buster -> R.color.colorBuster
++                                CardTypeEnum.Arts -> R.color.colorArts
++                                CardTypeEnum.Quick -> R.color.colorQuick
++                                else -> R.color.colorAccent
++                            }
++                            Surface(
++                                shape = MaterialTheme.shapes.small,
++                                color = colorResource(color),
++                                onClick = {
++                                    onSelected(CustomCard(slot, type))
++                                    onDismiss()
++                                },
++                                modifier = Modifier.size(45.dp)
++                            ) {
++                                Box(contentAlignment = Alignment.Center) {
++                                    val text = "${type.name[0]}${slot.position}"
++                                    Text(text, color = Color.White, fontWeight = FontWeight.Bold)
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun SelectedCardItem(
++    card: CustomCard,
++    onRemove: () -> Unit
++) {
++    val color = when (card.type) {
++        CardTypeEnum.Buster -> R.color.colorBuster
++        CardTypeEnum.Arts -> R.color.colorArts
++        CardTypeEnum.Quick -> R.color.colorQuick
++        else -> R.color.colorAccent
++    }
++
++    Box(
++        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
++    ) {
++        Surface(
++            tonalElevation = 5.dp,
++            shape = MaterialTheme.shapes.medium,
++            color = colorResource(color),
++            modifier = Modifier.size(50.dp)
++        ) {
++            Box(contentAlignment = Alignment.Center) {
++                Text(
++                    card.toString(),
++                    textAlign = TextAlign.Center,
++                    color = Color.White,
++                    fontWeight = FontWeight.Bold,
++                    style = MaterialTheme.typography.titleMedium
++                )
++            }
++        }
++
++        Surface(
++            shape = CircleShape,
++            color = MaterialTheme.colorScheme.error,
++            modifier = Modifier
++                .size(20.dp)
++                .align(Alignment.TopEnd)
++                .offset(x = 8.dp, y = (-8).dp)
++                .clickable { onRemove() }
++        ) {
++            Icon(
++                Icons.Default.Close,
++                contentDescription = "Remove",
++                tint = Color.White,
++                modifier = Modifier.padding(2.dp)
++            )
++        }
++    }
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnSelector.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnSelector.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..5fc61d06aa3c149818c3a656931ccc8cd6b85cc9
+--- /dev/null
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnSelector.kt
+@@ -0,0 +1,99 @@
++package io.github.fate_grand_automata.ui.custom_card_selection
++
++import androidx.compose.animation.AnimatedVisibility
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.lazy.LazyRow
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Add
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.res.painterResource
++import androidx.compose.ui.unit.dp
++import io.github.fate_grand_automata.R
++import io.github.fate_grand_automata.ui.PreventRtl
++
++@Composable
++fun CustomCardSelectionTurnSelector(
++    numberOfTurns: Int,
++    selectedTurn: Int,
++    onSelectedTurnChange: (Int) -> Unit,
++    onAddTurn: () -> Unit,
++    onRemoveTurn: (Int) -> Unit
++) {
++    PreventRtl {
++        Row(
++            modifier = Modifier
++                .fillMaxWidth()
++                .padding(horizontal = 16.dp)
++                .padding(bottom = 16.dp)
++        ) {
++            LazyRow(
++                verticalAlignment = Alignment.CenterVertically,
++                modifier = Modifier.weight(1f)
++            ) {
++                items(numberOfTurns) { index ->
++                    val isSelected = selectedTurn == index
++
++                    Row(
++                        verticalAlignment = Alignment.CenterVertically,
++                        modifier = Modifier
++                            .padding(end = 5.dp)
++                            .background(
++                                color = if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent,
++                                shape = MaterialTheme.shapes.medium
++                            )
++                            .clickable { onSelectedTurnChange(index) }
++                    ) {
++                        Text(
++                            text = "TURN ${index + 1}",
++                            color = if (isSelected) MaterialTheme.colorScheme.onSecondary else Color.Unspecified,
++                            modifier = Modifier.padding(5.dp, 2.dp)
++                        )
++
++                        AnimatedVisibility(index > 0 && index == numberOfTurns - 1) {
++                            Box(
++                                modifier = Modifier.clickable {
++                                    if (selectedTurn == index) {
++                                        onSelectedTurnChange(index - 1)
++                                    }
++                                    onRemoveTurn(index)
++                                }
++                            ) {
++                                Icon(
++                                    painterResource(R.drawable.ic_close),
++                                    contentDescription = "Remove turn",
++                                    tint = MaterialTheme.colorScheme.error
++                                )
++                            }
++                        }
++                    }
++                }
++            }
++
++            Box(
++                modifier = Modifier
++                    .background(MaterialTheme.colorScheme.secondary, shape = CircleShape)
++                    .clip(CircleShape)
++                    .clickable { onAddTurn() }
++            ) {
++                Icon(
++                    Icons.Default.Add,
++                    contentDescription = "Add turn",
++                    tint = MaterialTheme.colorScheme.onSecondary
++                )
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..74afd45823572257dd85a319061c86c29a076e38
+--- /dev/null
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt
+@@ -0,0 +1,64 @@
++package io.github.fate_grand_automata.ui.custom_card_selection
++
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.pager.HorizontalPager
++import androidx.compose.foundation.pager.rememberPagerState
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.HorizontalDivider
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.unit.dp
++import io.github.fate_grand_automata.ui.Heading
++import kotlinx.coroutines.launch
++
++@Composable
++fun CustomCardSelectionView(
++    vm: CustomCardSelectionViewModel
++) {
++    val pagerState = rememberPagerState(pageCount = { vm.turnSelections.size })
++    val scope = rememberCoroutineScope()
++
++    Box(
++        modifier = Modifier.fillMaxSize()
++    ) {
++        Column(
++            modifier = Modifier
++                .fillMaxWidth()
++                .verticalScroll(rememberScrollState())
++        ) {
++            Heading("Custom Card Selection")
++
++            CustomCardSelectionTurnSelector(
++                numberOfTurns = vm.turnSelections.size,
++                selectedTurn = pagerState.currentPage,
++                onSelectedTurnChange = { scope.launch { pagerState.animateScrollToPage(it) } },
++                onAddTurn = { vm.addTurn() },
++                onRemoveTurn = { vm.removeTurn(it) }
++            )
++
++            HorizontalDivider()
++
++            HorizontalPager(
++                state = pagerState,
++                verticalAlignment = Alignment.Top,
++                modifier = Modifier
++                    .fillMaxWidth()
++                    .padding(top = 16.dp)
++            ) { pageIndex ->
++                val selection = vm.turnSelections[pageIndex]
++                
++                CustomCardSelectionTurnItem(
++                    selection = selection,
++                    onSelectionChange = { vm.updateTurn(pageIndex, it) }
++                )
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionViewModel.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionViewModel.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..54150efc3c2164605a69c7c87feefa265c84a14f
+--- /dev/null
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionViewModel.kt
+@@ -0,0 +1,43 @@
++package io.github.fate_grand_automata.ui.custom_card_selection
++
++import androidx.compose.runtime.snapshots.SnapshotStateList
++import androidx.compose.runtime.toMutableStateList
++import androidx.lifecycle.ViewModel
++import dagger.hilt.android.lifecycle.HiltViewModel
++import io.github.fate_grand_automata.prefs.core.BattleConfigCore
++import io.github.fate_grand_automata.scripts.models.CustomCardSelection
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
++import javax.inject.Inject
++
++@HiltViewModel
++class CustomCardSelectionViewModel @Inject constructor(
++    val battleConfig: BattleConfigCore
++) : ViewModel() {
++    val turnSelections: SnapshotStateList<CustomCardSelection> by lazy {
++        battleConfig.customCardSelection.get().toMutableStateList()
++    }
++
++    fun addTurn() {
++        turnSelections.add(CustomCardSelection.empty)
++        save()
++    }
++
++    fun removeTurn(index: Int) {
++        if (index in turnSelections.indices) {
++            turnSelections.removeAt(index)
++            save()
++        }
++    }
++
++    fun updateTurn(index: Int, selection: CustomCardSelection) {
++        if (index in turnSelections.indices) {
++            turnSelections[index] = selection
++            save()
++        }
++    }
++
++    fun save() {
++        val perTurn = CustomCardSelectionPerTurn.from(turnSelections.toList())
++        battleConfig.customCardSelection.set(perTurn)
++    }
++}
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/main/FgaApp.kt b/app/src/main/java/io/github/fate_grand_automata/ui/main/FgaApp.kt
+index 82896b71b863288db6caaef4f94a72c9be47949e..39cc6457d11f562bf4f46c2f2e41fb6d9b2578f5 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/main/FgaApp.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/main/FgaApp.kt
+@@ -19,6 +19,7 @@ import io.github.fate_grand_automata.ui.battle_config_item.BattleConfigDestinati
+ import io.github.fate_grand_automata.ui.battle_config_item.BattleConfigScreen
+ import io.github.fate_grand_automata.ui.battle_config_list.BattleConfigListScreen
+ import io.github.fate_grand_automata.ui.card_priority.CardPriorityScreen
++import io.github.fate_grand_automata.ui.custom_card_selection.CustomCardSelectionScreen
+ import io.github.fate_grand_automata.ui.fine_tune.FineTuneScreen
+ import io.github.fate_grand_automata.ui.more.MoreOptionsScreen
+ import io.github.fate_grand_automata.ui.onboarding.OnboardingScreen
+@@ -144,6 +145,7 @@ fun FgaApp(
+                         when (it) {
+                             BattleConfigDestination.Back -> navController.popBackStack()
+                             BattleConfigDestination.CardPriority -> navigate(NavConstants.cardPriority, id)
++                            BattleConfigDestination.CustomCardSelection -> navigate(NavConstants.customCardSelection, id)
+                             is BattleConfigDestination.Other -> {
+                                 navigate(NavConstants.battleConfigItem, it.id) {
+                                     popUpTo(NavConstants.battleConfigs)
+@@ -169,6 +171,11 @@ fun FgaApp(
+                     vm = hiltViewModel()
+                 )
+             }
++            battleConfigComposable(NavConstants.customCardSelection) { _, _ ->
++                CustomCardSelectionScreen(
++                    vm = hiltViewModel()
++                )
++            }
+             battleConfigComposable(NavConstants.preferredSupport) { _, _ ->
+                 PreferredSupportScreen(
+                     vm = hiltViewModel(),
+@@ -192,7 +199,8 @@ object NavConstants {
+     const val moreOptions = "more"
+     const val fineTune = "fineTune"
+     const val cardPriority = "cardPriority"
++    const val customCardSelection = "customCardSelection"
+     const val preferredSupport = "preferredSupport"
+     const val spam = "spam"
+     const val onboarding = "onboarding"
+-}
+\ No newline at end of file
++}
+diff --git a/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt b/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt
+index 05e9cab081332b56aeeaa431e00f2f49637df839..319b209f6036f90aebefd5e522447b552404dfc3 100644
+--- a/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt
++++ b/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt
+@@ -49,9 +49,7 @@ internal class BattleConfig(
+ 
+     override var spam by prefs.spam
+ 
+-//     todo: replace this after UI implementation
+-//    override val customCardSelection by prefs.customCardSelection
+-    override val customCardSelectionRaw by prefs.customCardSelectionRaw
++    override val customCardSelection by prefs.customCardSelection
+ 
+     override fun export(): Map<String, *> = prefs.export()
+ 
+diff --git a/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt b/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt
+index 74cd76d868b6caa8616c09d3b3ea7a1b08268cc5..988d066368327f75a77dfb47e3e814c4d404ff1d 100644
+--- a/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt
++++ b/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt
+@@ -14,7 +14,7 @@ import io.github.fate_grand_automata.scripts.enums.ShuffleCardsEnum
+ import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
+-//import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ 
+ class BattleConfigCore(
+     val id: String,
+@@ -191,17 +191,15 @@ class BattleConfigCore(
+ 
+     val raidTurnDelaySeconds = maker.stringAsInt("raid_delay_seconds", 3)
+ 
+-//    val customCardSelection = maker.serialized(
+-//        "custom_card_selection",
+-//        serializer = object : Serializer<CustomCardSelectionPerTurn> {
+-//            override fun deserialize(serialized: String) =
+-//                CustomCardSelectionPerTurn.of(serialized)
+-//
+-//            override fun serialize(value: CustomCardSelectionPerTurn) =
+-//                value.toString()
+-//        },
+-//        default = CustomCardSelectionPerTurn.empty
+-//    )
+-//    todo: replace this after UI implementation
+-    var customCardSelectionRaw = maker.string("custom_card_selection_raw")
++    val customCardSelection = maker.serialized(
++        "custom_card_selection",
++        serializer = object : Serializer<CustomCardSelectionPerTurn> {
++            override fun deserialize(serialized: String) =
++                CustomCardSelectionPerTurn.of(serialized)
++
++            override fun serialize(value: CustomCardSelectionPerTurn) =
++                value.toString()
++        },
++        default = CustomCardSelectionPerTurn.empty
++    )
+ }
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+index afdb0ec5e7409f7afe066195f339c71fcd317d1b..d84251392c30f0df4a1a364c8598af26ad1bd389 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+@@ -2,4 +2,14 @@ package io.github.fate_grand_automata.scripts.models
+ 
+ import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
+ 
+-data class CustomCard(val fieldSlot: FieldSlot, val type: CardTypeEnum)
++data class CustomCard(val fieldSlot: FieldSlot, val type: CardTypeEnum) {
++    override fun toString(): String {
++        val typeChar = when (type) {
++            CardTypeEnum.Buster -> 'B'
++            CardTypeEnum.Arts -> 'A'
++            CardTypeEnum.Quick -> 'Q'
++            else -> '?'
++        }
++        return "$typeChar${fieldSlot.position}"
++    }
++}
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+index 9de41f31bd8c1d686a73c1dacff0e21948523084..e5d8609833e71be5bc5e0673a323ba4206f4ee69 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+@@ -6,7 +6,7 @@ import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
+ class CustomCardSelection(
+     private val cards: List<CustomCard>
+ ) : List<CustomCard> by cards {
+-    override fun toString() = joinToString()
++    override fun toString() = joinToString(separator = "")
+ 
+ 
+     companion object {
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt
+index c971c80e7bfe8b567ac2a2d9dc6800939611e259..cbfb92d2ede41c87ca3c5fd50a920b59b9ac7ec3 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt
+@@ -23,7 +23,7 @@ class CustomCardSelectionPerTurn private constructor(
+     companion object {
+         private const val separator = ","
+ 
+-        val empty = CustomCardSelectionPerTurn(emptyList())
++        val empty = CustomCardSelectionPerTurn(listOf(CustomCardSelection.empty))
+ 
+         fun from(selectionsPerTurn: List<CustomCardSelection>) =
+             CustomCardSelectionPerTurn(selectionsPerTurn)
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt
+index 95863b6cc8254974ab1e0d134541de2f3dd60cdf..bf41875498d6b3e0f2bc912384af66100e3e4d88 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt
+@@ -32,8 +32,8 @@ interface IBattleConfig {
+     val addRaidTurnDelay: Boolean
+     val raidTurnDelaySeconds : Int
+ 
+-//    val customCardSelection: CustomCardSelectionPerTurn
+-    val customCardSelectionRaw: String
++    val customCardSelection: CustomCardSelectionPerTurn
++
+     fun export(): Map<String, *>
+ 
+     fun import(map: Map<String, *>)
+-- 
+2.54.0.windows.1
+

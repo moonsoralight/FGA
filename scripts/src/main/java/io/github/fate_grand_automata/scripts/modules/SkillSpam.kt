@@ -5,9 +5,12 @@ import io.github.fate_grand_automata.scripts.models.FieldSlot
 import io.github.fate_grand_automata.scripts.models.ServantTarget
 import io.github.fate_grand_automata.scripts.models.SkillSpamConfig
 import io.github.fate_grand_automata.scripts.models.SkillSpamTarget
+import io.github.fate_grand_automata.scripts.models.Skill
 import io.github.fate_grand_automata.scripts.models.SpamConfigPerTeamSlot
 import io.github.fate_grand_automata.scripts.models.battle.BattleState
+import io.github.fate_grand_automata.scripts.models.includesSpamWave
 import io.github.fate_grand_automata.scripts.models.skills
+import io.github.fate_grand_automata.scripts.prefs.IBattleConfig
 import io.github.lib_automata.dagger.ScriptScope
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -18,7 +21,8 @@ class SkillSpam @Inject constructor(
     private val servantTracker: ServantTracker,
     private val state: BattleState,
     private val spamConfig: SpamConfigPerTeamSlot,
-    private val caster: Caster
+    private val caster: Caster,
+    private val battleConfig: IBattleConfig
 ) : IFgoAutomataApi by api {
     companion object {
         val skillSpamDelay = 0.25.seconds
@@ -31,7 +35,9 @@ class SkillSpam @Inject constructor(
             val servantSpamConfig = spamConfig[teamSlot]
 
             servantSpamConfig.skills.forEachIndexed { skillIndex, skillSpamConfig ->
-                if (caster.canSpam(skillSpamConfig.spam) && (state.stage + 1) in skillSpamConfig.waves) {
+                if (skillSpamConfig.waves.includesSpamWave(state.stage + 1) &&
+                    caster.canSpam(skillSpamConfig.spam)
+                ) {
                     val skill = skills[skillIndex]
                     val skillImage = servantTracker
                         .checkImages[teamSlot]
@@ -51,6 +57,17 @@ class SkillSpam @Inject constructor(
                 }
             }
         }
+
+        battleConfig.masterSpam.skills.forEachIndexed { index, skillSpamConfig ->
+            if (skillSpamConfig.waves.includesSpamWave(state.stage + 1) &&
+                caster.canSpam(skillSpamConfig.spam)
+            ) {
+                caster.castMasterSkill(
+                    Skill.Master.list[index],
+                    skillSpamConfig.determineMasterTarget()
+                )
+            }
+        }
     }
 
     private fun SkillSpamConfig.determineTarget(fieldSlot: FieldSlot) =
@@ -68,4 +85,13 @@ class SkillSpam @Inject constructor(
             SkillSpamTarget.Left -> ServantTarget.Left
             SkillSpamTarget.Right -> ServantTarget.Right
         }
+
+    private fun SkillSpamConfig.determineMasterTarget() = when (target) {
+        SkillSpamTarget.Slot1 -> ServantTarget.A
+        SkillSpamTarget.Slot2 -> ServantTarget.B
+        SkillSpamTarget.Slot3 -> ServantTarget.C
+        SkillSpamTarget.Left -> ServantTarget.Left
+        SkillSpamTarget.Right -> ServantTarget.Right
+        SkillSpamTarget.None, SkillSpamTarget.Self -> null
+    }
 }

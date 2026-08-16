@@ -67,6 +67,7 @@ private fun AutoBattle.ExitReason.text(): String = when (this) {
     is AutoBattle.ExitReason.LimitCEs -> stringResource(R.string.ces_dropped, count)
     is AutoBattle.ExitReason.LimitMaterials -> stringResource(R.string.mats_farmed, count)
     AutoBattle.ExitReason.WithdrawDisabled -> stringResource(R.string.withdraw_disabled)
+    AutoBattle.ExitReason.CommandSpellReviveFailed -> stringResource(R.string.command_spell_revive_failed)
     AutoBattle.ExitReason.APRanOut -> stringResource(R.string.script_msg_ap_ran_out)
     AutoBattle.ExitReason.InventoryFull -> stringResource(R.string.inventory_full)
     is AutoBattle.ExitReason.LimitRuns -> stringResource(R.string.times_ran, count)
@@ -74,9 +75,11 @@ private fun AutoBattle.ExitReason.text(): String = when (this) {
     AutoBattle.ExitReason.SupportSelectionPreferredNotSet -> stringResource(R.string.support_selection_preferred_not_set)
     is AutoBattle.ExitReason.SkillCommandParseError -> "AutoSkill Parse error:\n\n${cause?.message}"
     is AutoBattle.ExitReason.CardPriorityParseError -> msg
+    is AutoBattle.ExitReason.CustomCardSelectionParseError -> msg
     AutoBattle.ExitReason.FirstClearRewards -> stringResource(R.string.first_clear_rewards)
     AutoBattle.ExitReason.Paused -> stringResource(R.string.script_paused)
     AutoBattle.ExitReason.StopAfterThisRun -> stringResource(R.string.stop_after_this_run)
+    is AutoBattle.ExitReason.AutoDreamFireFailed -> msg
 }
 
 @Composable

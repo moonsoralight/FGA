@@ -1,0 +1,384 @@
+From fc10b767cc9589bff199f0d733161d73c0de1594 Mon Sep 17 00:00:00 2001
+From: sheng-28 <lishengsheng28@gmail.com>
+Date: Thu, 5 Mar 2026 17:22:52 +1100
+Subject: [PATCH 1/5] Add turn-based custom card selction with text input for
+ config
+
+---
+ .../di/script/PreferencesModule.kt            |  7 +++
+ .../battle_config_item/BattleConfigScreen.kt  |  4 ++
+ .../fate_grand_automata/ui/exit/BattleExit.kt |  1 +
+ .../fate_grand_automata/prefs/BattleConfig.kt |  7 ++-
+ .../prefs/core/BattleConfigCore.kt            | 17 +++++-
+ .../scripts/entrypoints/AutoBattle.kt         |  1 +
+ .../scripts/models/CustomCard.kt              |  5 ++
+ .../scripts/models/CustomCardSelection.kt     | 58 +++++++++++++++++++
+ .../models/CustomCardSelectionPerTurn.kt      | 42 ++++++++++++++
+ .../scripts/models/battle/BattleState.kt      |  1 +
+ .../modules/ApplyCustomCardSelection.kt       | 34 +++++++++++
+ .../scripts/modules/Card.kt                   |  8 ++-
+ .../scripts/prefs/IBattleConfig.kt            |  3 +
+ 13 files changed, 185 insertions(+), 3 deletions(-)
+ create mode 100644 scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+ create mode 100644 scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+ create mode 100644 scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt
+ create mode 100644 scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt
+
+diff --git a/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt b/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt
+index cef7ac31f47527c8c5db53e8c9a79dd151cd2ac4..df2c4b2f58e83d7c04b5d7e1837c30e0297508a4 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/di/script/PreferencesModule.kt
+@@ -12,6 +12,7 @@ import io.github.fate_grand_automata.scripts.prefs.IPreferences
+ import io.github.fate_grand_automata.scripts.prefs.ISupportPreferences
+ import io.github.fate_grand_automata.scripts.prefs.ISupportPreferencesCommon
+ import io.github.lib_automata.dagger.ScriptScope
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ 
+ @Module
+ @InstallIn(ScriptComponent::class)
+@@ -50,4 +51,10 @@ class PreferencesModule {
+     @Provides
+     fun provideServantPriority(battleConfig: IBattleConfig): ServantPriorityPerWave? =
+         if (battleConfig.useServantPriority) battleConfig.servantPriority else null
++
++    @ScriptScope
++    @Provides
++    fun provideCustomCardSelection(battleConfig: IBattleConfig): CustomCardSelectionPerTurn =
++        CustomCardSelectionPerTurn.of(battleConfig.customCardSelectionRaw)
++//    todo:replace String config after UI implementation
+ }
+\ No newline at end of file
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+index 4fe61bcbc90e84c25d539e45df0ec0d24dced7e7..0d6d5ca3db6935d5b6c638e75ef8deb407c3fc78 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+@@ -160,6 +160,10 @@ private fun BattleConfigContent(
+                             config.notes.EditTextPreference(
+                                 title = stringResource(R.string.p_battle_config_notes)
+                             )
++                            // todo: remove this after UI implementation
++                            config.customCardSelectionRaw.EditTextPreference(
++                                title = "Custom Card Selection"
++                            )
+                         }
+                     }
+                 }
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/exit/BattleExit.kt b/app/src/main/java/io/github/fate_grand_automata/ui/exit/BattleExit.kt
+index fbc59068c2af8b510a7271e3db6df48022ffffac..c14c3aa572f6a6e51770659f25725e91319e3877 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/exit/BattleExit.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/exit/BattleExit.kt
+@@ -74,6 +74,7 @@ private fun AutoBattle.ExitReason.text(): String = when (this) {
+     AutoBattle.ExitReason.SupportSelectionPreferredNotSet -> stringResource(R.string.support_selection_preferred_not_set)
+     is AutoBattle.ExitReason.SkillCommandParseError -> "AutoSkill Parse error:\n\n${cause?.message}"
+     is AutoBattle.ExitReason.CardPriorityParseError -> msg
++    is AutoBattle.ExitReason.CustomCardSelectionParseError -> msg
+     AutoBattle.ExitReason.FirstClearRewards -> stringResource(R.string.first_clear_rewards)
+     AutoBattle.ExitReason.Paused -> stringResource(R.string.script_paused)
+     AutoBattle.ExitReason.StopAfterThisRun -> stringResource(R.string.stop_after_this_run)
+diff --git a/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt b/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt
+index e6ae50cddbf2c48e1816936ec9328ce2576a0189..05e9cab081332b56aeeaa431e00f2f49637df839 100644
+--- a/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt
++++ b/prefs/src/main/java/io/github/fate_grand_automata/prefs/BattleConfig.kt
+@@ -15,6 +15,7 @@ internal class BattleConfig(
+     override var skillCommand by prefs.skillCommand
+ 
+     override var cardPriority by prefs.cardPriority
++
+     override val rearrangeCards by prefs.rearrangeCards
+     override val braveChains by prefs.braveChains
+ 
+@@ -48,6 +49,10 @@ internal class BattleConfig(
+ 
+     override var spam by prefs.spam
+ 
++//     todo: replace this after UI implementation
++//    override val customCardSelection by prefs.customCardSelection
++    override val customCardSelectionRaw by prefs.customCardSelectionRaw
++
+     override fun export(): Map<String, *> = prefs.export()
+ 
+     override fun import(map: Map<String, *>) =
+@@ -62,4 +67,4 @@ internal class BattleConfig(
+     }
+ 
+     override fun hashCode() = id.hashCode()
+-}
+\ No newline at end of file
++}
+diff --git a/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt b/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt
+index c5e528083189567ff627fc5cd6e2cfeccb7ea767..74cd76d868b6caa8616c09d3b3ea7a1b08268cc5 100644
+--- a/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt
++++ b/prefs/src/main/java/io/github/fate_grand_automata/prefs/core/BattleConfigCore.kt
+@@ -14,6 +14,7 @@ import io.github.fate_grand_automata.scripts.enums.ShuffleCardsEnum
+ import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
++//import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ 
+ class BattleConfigCore(
+     val id: String,
+@@ -189,4 +190,18 @@ class BattleConfigCore(
+     val addRaidTurnDelay = maker.bool("add_raid_delay")
+ 
+     val raidTurnDelaySeconds = maker.stringAsInt("raid_delay_seconds", 3)
+-}
+\ No newline at end of file
++
++//    val customCardSelection = maker.serialized(
++//        "custom_card_selection",
++//        serializer = object : Serializer<CustomCardSelectionPerTurn> {
++//            override fun deserialize(serialized: String) =
++//                CustomCardSelectionPerTurn.of(serialized)
++//
++//            override fun serialize(value: CustomCardSelectionPerTurn) =
++//                value.toString()
++//        },
++//        default = CustomCardSelectionPerTurn.empty
++//    )
++//    todo: replace this after UI implementation
++    var customCardSelectionRaw = maker.string("custom_card_selection_raw")
++}
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/entrypoints/AutoBattle.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/entrypoints/AutoBattle.kt
+index 8f163d919c449ae4311291050daa231e5a6c9ec2..cfe2593d3556a8cd9d2b5897d8d3673e5e37b370 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/entrypoints/AutoBattle.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/entrypoints/AutoBattle.kt
+@@ -72,6 +72,7 @@ class AutoBattle @Inject constructor(
+         data object SupportSelectionPreferredNotSet : ExitReason()
+         class SkillCommandParseError(cause: Exception) : ExitReason(cause)
+         class CardPriorityParseError(val msg: String) : ExitReason()
++        class CustomCardSelectionParseError(val msg: String) : ExitReason()
+         data object Paused : ExitReason()
+         data object StopAfterThisRun : ExitReason()
+     }
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..afdb0ec5e7409f7afe066195f339c71fcd317d1b
+--- /dev/null
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+@@ -0,0 +1,5 @@
++package io.github.fate_grand_automata.scripts.models
++
++import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
++
++data class CustomCard(val fieldSlot: FieldSlot, val type: CardTypeEnum)
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..9de41f31bd8c1d686a73c1dacff0e21948523084
+--- /dev/null
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+@@ -0,0 +1,58 @@
++package io.github.fate_grand_automata.scripts.models
++
++import io.github.fate_grand_automata.scripts.entrypoints.AutoBattle
++import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
++
++class CustomCardSelection(
++    private val cards: List<CustomCard>
++) : List<CustomCard> by cards {
++    override fun toString() = joinToString()
++
++
++    companion object {
++        val empty = CustomCardSelection(emptyList())
++
++        private const val customCardSelectionError = "Custom Card Selection Error at '"
++
++        private fun raiseParseError(msg: String): Nothing {
++            throw AutoBattle.BattleExitException(
++                AutoBattle.ExitReason.CustomCardSelectionParseError(msg)
++            )
++        }
++
++        fun of(selection: String): CustomCardSelection {
++            val cards = selection
++                .filter { !it.isWhitespace() }
++                .uppercase()
++                .chunked(2)
++                .map {
++                    when (it.length) {
++                        2 -> it
++                        else -> raiseParseError("$customCardSelectionError${it}': Invalid card.")
++                    }
++                }
++                .map {
++                    val type = when (it[0]) {
++                        'B' -> CardTypeEnum.Buster
++                        'A' -> CardTypeEnum.Arts
++                        'Q' -> CardTypeEnum.Quick
++                        else -> raiseParseError("$customCardSelectionError${it}': Invalid card type.")
++                    }
++                    val fieldSlot = when (it[1]) {
++                        '1' -> FieldSlot.A
++                        '2' -> FieldSlot.B
++                        '3' -> FieldSlot.C
++                        else -> raiseParseError("$customCardSelectionError${it}': Invalid servant field slot.")
++                    }
++
++                    CustomCard(fieldSlot, type)
++
++                }
++
++            if (cards.size > 3) {
++                raiseParseError("$customCardSelectionError': Expected at most 3 cards selected per turn, but ${cards.size} found.")
++            }
++            return CustomCardSelection(cards)
++        }
++    }
++}
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..c971c80e7bfe8b567ac2a2d9dc6800939611e259
+--- /dev/null
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelectionPerTurn.kt
+@@ -0,0 +1,42 @@
++package io.github.fate_grand_automata.scripts.models
++
++class CustomCardSelectionPerTurn private constructor(
++    private val selectionPerTurn: List<CustomCardSelection>
++) : List<CustomCardSelection> by selectionPerTurn {
++
++    /**
++     * Gets the selection for current turn
++     * Returns empty selection when index is out of bounds.
++     */
++    fun atTurn(turn: Int): CustomCardSelection {
++        val index = turn - 1
++        return if (index in selectionPerTurn.indices) {
++            selectionPerTurn[index]
++        } else {
++            CustomCardSelection.empty
++        }
++    }
++
++    override fun toString() =
++        selectionPerTurn.joinToString(separator)
++
++    companion object {
++        private const val separator = ","
++
++        val empty = CustomCardSelectionPerTurn(emptyList())
++
++        fun from(selectionsPerTurn: List<CustomCardSelection>) =
++            CustomCardSelectionPerTurn(selectionsPerTurn)
++
++        fun of(selection: String): CustomCardSelectionPerTurn =
++            if (selection.isBlank()) {
++                empty
++            } else {
++                CustomCardSelectionPerTurn(
++                    selection
++                        .split(separator)
++                        .map { CustomCardSelection.of(it) }
++                )
++            }
++    }
++}
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/battle/BattleState.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/battle/BattleState.kt
+index 5b22fd9a75736b3e386e734c8d3c1808a7bea2fb..c64adc429434c1d707c3d366ea35cc46970411cc 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/battle/BattleState.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/battle/BattleState.kt
+@@ -69,6 +69,7 @@ class BattleState @Inject constructor() {
+ 
+     val stage get() = runState.stage
+     val turn get() = runState.turn
++    val currentTurn get() = runState.totalTurns
+ 
+     fun nextTurn() = runState.nextTurn()
+     fun nextStage() = runState.nextStage()
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..dfc5e5f7fee76e924a0d3b9b0fe8d7ae7b5c7f1f
+--- /dev/null
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt
+@@ -0,0 +1,34 @@
++package io.github.fate_grand_automata.scripts.modules
++
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
++import io.github.fate_grand_automata.scripts.models.ParsedCard
++import io.github.lib_automata.dagger.ScriptScope
++import javax.inject.Inject
++
++@ScriptScope
++class ApplyCustomCardSelection @Inject constructor(
++    private val selection: CustomCardSelectionPerTurn
++) {
++    /**
++     * Puts all selected cards in the front
++     * Returns null if no selection found
++     * Returns null if not all selected cards are available
++     */
++    fun pick(
++        cards: List<ParsedCard>,
++        turn: Int
++    ): List<ParsedCard>? {
++        val requirements = selection.atTurn(turn)
++        if (requirements.isEmpty()) return null
++
++        val available = cards.toMutableList()
++        val picked = requirements.map { requirement ->
++            available.find {
++                it.fieldSlot == requirement.fieldSlot && it.type == requirement.type
++            }?.also { available.remove(it) }
++                ?: return null
++        }
++
++        return picked + available
++    }
++}
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt
+index 6296f0bae31efa16be20523a1db2a910db9399b5..9760857fec25ebd892291e80ff46850cb064b993 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt
+@@ -4,6 +4,8 @@ import io.github.fate_grand_automata.scripts.IFgoAutomataApi
+ import io.github.fate_grand_automata.scripts.ScriptLog
+ import io.github.fate_grand_automata.scripts.enums.BraveChainEnum
+ import io.github.fate_grand_automata.scripts.models.CommandCard
++import io.github.fate_grand_automata.scripts.models.CustomCardSelection
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ import io.github.fate_grand_automata.scripts.models.FieldSlot
+ import io.github.fate_grand_automata.scripts.models.NPUsage
+ import io.github.fate_grand_automata.scripts.models.ParsedCard
+@@ -23,7 +25,8 @@ class Card @Inject constructor(
+     private val parser: CardParser,
+     private val priority: FaceCardPriority,
+     private val braveChains: ApplyBraveChains,
+-    private val battleConfig: IBattleConfig
++    private val battleConfig: IBattleConfig,
++    private val selection: ApplyCustomCardSelection
+ ) : IFgoAutomataApi by api {
+ 
+     fun readCommandCards(): List<ParsedCard> = useSameSnapIn {
+@@ -47,6 +50,9 @@ class Card @Inject constructor(
+         cards: List<ParsedCard>,
+         npUsage: NPUsage
+     ): List<CommandCard.Face> {
++        val customSelected = selection.pick(cards, state.currentTurn)?.map { it.card }
++        if (customSelected != null) return customSelected // Overrides priority order
++
+         val cardsOrderedByPriority = priority.sort(cards, state.stage)
+ 
+         fun <T> List<T>.inCurrentWave(default: T) =
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt
+index 28c9ca34506287ec2b8ec2ec9154dec8b96f3705..95863b6cc8254974ab1e0d134541de2f3dd60cdf 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/prefs/IBattleConfig.kt
+@@ -7,6 +7,7 @@ import io.github.fate_grand_automata.scripts.enums.ShuffleCardsEnum
+ import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
+ import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ 
+ interface IBattleConfig {
+     val id: String
+@@ -31,6 +32,8 @@ interface IBattleConfig {
+     val addRaidTurnDelay: Boolean
+     val raidTurnDelaySeconds : Int
+ 
++//    val customCardSelection: CustomCardSelectionPerTurn
++    val customCardSelectionRaw: String
+     fun export(): Map<String, *>
+ 
+     fun import(map: Map<String, *>)
+-- 
+2.54.0.windows.1
+

@@ -71,6 +71,7 @@ val ShuffleCardsEnum.stringRes
         ShuffleCardsEnum.NoNPMatching -> R.string.p_shuffle_cards_when_no_np_matching
     }
 
+
 val MaterialEnum.stringRes: Int
     get() = when (this) {
         MaterialEnum.Proof -> R.string.mat_proof

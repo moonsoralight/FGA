@@ -1,0 +1,578 @@
+From 70af22dbb58662811a198aecc90a11834e422c3d Mon Sep 17 00:00:00 2001
+From: Codex Build <codex-build@local.invalid>
+Date: Mon, 3 Aug 2026 02:18:57 +0800
+Subject: [PATCH 5/5] Extend custom card combinations and fix picker scrolling
+
+---
+ app/src/ci/res/values/strings.xml             |  4 +-
+ .../battle_config_item/BattleConfigScreen.kt  | 13 ++-
+ .../CustomCardSelectionTurnItem.kt            | 98 ++++++++++++-------
+ app/src/main/res/values/localized.xml         |  3 +-
+ .../scripts/models/CustomCard.kt              | 28 ++++--
+ .../scripts/models/CustomCardSelection.kt     | 57 +++++++----
+ .../modules/ApplyCustomCardSelection.kt       | 28 ++++--
+ .../scripts/modules/Card.kt                   | 57 +++++++++--
+ .../scripts/CustomCardSelectionTest.kt        | 95 ++++++++++++++++++
+ 9 files changed, 289 insertions(+), 94 deletions(-)
+ create mode 100644 scripts/src/test/java/io/github/fate_grand_automata/scripts/CustomCardSelectionTest.kt
+
+diff --git a/app/src/ci/res/values/strings.xml b/app/src/ci/res/values/strings.xml
+index 158a14580f5edb54aa0ad42f5800cdc4201ae3cf..7b889de1952502b8805eab5eee835f95eab212b4 100644
+--- a/app/src/ci/res/values/strings.xml
++++ b/app/src/ci/res/values/strings.xml
+@@ -1,3 +1,3 @@
+ <resources>
+-    <string name="app_name">FGA (CI)</string>
+-</resources>
+\ No newline at end of file
++    <string name="app_name">FGA PR2196 Extended</string>
++</resources>
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+index 24b6ba5a30771c7172d42a9c83a03f021c0c812c..ab2839221efac7635e79e01902702a181708f211 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+@@ -291,11 +291,14 @@ private val CardScore.color: Color
+ 
+ private val CustomCard.color: Color
+     @Composable get() {
+-        val colorRes = when (type) {
+-            CardTypeEnum.Buster -> R.color.colorBuster
+-            CardTypeEnum.Arts -> R.color.colorArts
+-            CardTypeEnum.Quick -> R.color.colorQuick
+-            else -> R.color.colorAccent
++        val colorRes = when (this) {
++            is CustomCard.NoblePhantasm -> R.color.colorAccent
++            is CustomCard.Face -> when (type) {
++                CardTypeEnum.Buster -> R.color.colorBuster
++                CardTypeEnum.Arts -> R.color.colorArts
++                CardTypeEnum.Quick -> R.color.colorQuick
++                else -> R.color.colorAccent
++            }
+         }
+         return colorResource(colorRes)
+     }
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+index bcc732d40d63bd0ef4ce9dd039791f8700329511..3101c353949c19b33784dad28467781a9a5d0624 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+@@ -9,7 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.offset
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+-import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.lazy.LazyRow
++import androidx.compose.foundation.lazy.items
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.filled.Add
+@@ -107,7 +108,8 @@ private fun CardPicker(
+         Surface(
+             shape = MaterialTheme.shapes.medium,
+             color = MaterialTheme.colorScheme.surface,
+-            tonalElevation = 8.dp
++            tonalElevation = 8.dp,
++            modifier = Modifier.fillMaxWidth()
+         ) {
+             Column(
+                 modifier = Modifier.padding(16.dp),
+@@ -120,36 +122,50 @@ private fun CardPicker(
+                 )
+ 
+                 val types = listOf(CardTypeEnum.Buster, CardTypeEnum.Arts, CardTypeEnum.Quick)
+-                Row(
+-                    modifier = Modifier.padding(vertical = 4.dp),
+-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
++                val pickerGroups = listOf(
++                    stringResource(R.string.p_custom_card_selection_any_servant) to
++                            types.map { CustomCard.Face(type = it) }
++                ) + FieldSlot.list.map { slot ->
++                    "S${slot.position}" to (
++                            listOf(CustomCard.NoblePhantasm(slot)) +
++                                    types.map { CustomCard.Face(type = it, fieldSlot = slot) }
++                            )
++                }
++
++                LazyRow(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(vertical = 4.dp),
++                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                     verticalAlignment = Alignment.CenterVertically
+                 ) {
+-                    FieldSlot.list.forEach { slot ->
+-                        Text(
+-                            "S${slot.position}",
+-                            style = MaterialTheme.typography.labelLarge,
+-                            modifier = Modifier.padding(horizontal = 4.dp)
+-                        )
+-                        types.forEach { type ->
+-                            val color = when (type) {
+-                                CardTypeEnum.Buster -> R.color.colorBuster
+-                                CardTypeEnum.Arts -> R.color.colorArts
+-                                CardTypeEnum.Quick -> R.color.colorQuick
+-                                else -> R.color.colorAccent
+-                            }
+-                            Surface(
+-                                shape = MaterialTheme.shapes.small,
+-                                color = colorResource(color),
+-                                onClick = {
+-                                    onSelected(CustomCard(slot, type))
+-                                    onDismiss()
+-                                },
+-                                modifier = Modifier.size(45.dp)
+-                            ) {
+-                                Box(contentAlignment = Alignment.Center) {
+-                                    val text = "${type.name[0]}${slot.position}"
+-                                    Text(text, color = Color.White, fontWeight = FontWeight.Bold)
++                    items(pickerGroups) { (label, cards) ->
++                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
++                            Text(
++                                label,
++                                style = MaterialTheme.typography.labelLarge,
++                                modifier = Modifier.padding(bottom = 6.dp)
++                            )
++
++                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
++                                cards.forEach { card ->
++                                    Surface(
++                                        shape = MaterialTheme.shapes.small,
++                                        color = card.color,
++                                        onClick = {
++                                            onSelected(card)
++                                            onDismiss()
++                                        },
++                                        modifier = Modifier.size(45.dp)
++                                    ) {
++                                        Box(contentAlignment = Alignment.Center) {
++                                            Text(
++                                                card.toString(),
++                                                color = Color.White,
++                                                fontWeight = FontWeight.Bold
++                                            )
++                                        }
++                                    }
+                                 }
+                             }
+                         }
+@@ -165,20 +181,13 @@ private fun SelectedCardItem(
+     card: CustomCard,
+     onRemove: () -> Unit
+ ) {
+-    val color = when (card.type) {
+-        CardTypeEnum.Buster -> R.color.colorBuster
+-        CardTypeEnum.Arts -> R.color.colorArts
+-        CardTypeEnum.Quick -> R.color.colorQuick
+-        else -> R.color.colorAccent
+-    }
+-
+     Box(
+         modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+     ) {
+         Surface(
+             tonalElevation = 5.dp,
+             shape = MaterialTheme.shapes.medium,
+-            color = colorResource(color),
++            color = card.color,
+             modifier = Modifier.size(50.dp)
+         ) {
+             Box(contentAlignment = Alignment.Center) {
+@@ -210,3 +219,16 @@ private fun SelectedCardItem(
+         }
+     }
+ }
++
++private val CustomCard.color: Color
++    @Composable get() = colorResource(
++        when (this) {
++            is CustomCard.NoblePhantasm -> R.color.colorAccent
++            is CustomCard.Face -> when (type) {
++                CardTypeEnum.Buster -> R.color.colorBuster
++                CardTypeEnum.Arts -> R.color.colorArts
++                CardTypeEnum.Quick -> R.color.colorQuick
++                else -> R.color.colorAccent
++            }
++        }
++    )
+diff --git a/app/src/main/res/values/localized.xml b/app/src/main/res/values/localized.xml
+index 913a34a52d90f593333d798c28796c99e6a37649..b8c48f947d23c2e1c9e2ce522c80c2989987007b 100644
+--- a/app/src/main/res/values/localized.xml
++++ b/app/src/main/res/values/localized.xml
+@@ -493,6 +493,7 @@ After pressing on the button, switch the app filter from \"Not optimized\" to \"
+     <string name="reset">Reset</string>
+ 
+     <string name="p_custom_card_selection">Custom Card Selection</string>
+-    <string name="p_custom_card_selection_dialog_message">Define specific cards to use for each turn of the battle.\n\nIf the cards selected are present in available cards, the script will click them in the exact order as defined.\n\nIf even one of your required cards is missing from the hand, the script will ignore the custom selection and fall back to Card Priority settings.\n\nIf selected cards are less than 3, more cards would be picked from rest automatically.</string>
++    <string name="p_custom_card_selection_dialog_message">Define up to three commands for each turn. N1/N2/N3 selects that servant\'s NP; B/A/Q selects any face card of that color; B1/A1/Q1 and equivalent 2/3 forms select that servant\'s face card.\n\nWhen the whole combination is available, it is clicked in the exact order shown. If a required face card is missing, FGA falls back to the existing Servant Priority or Card Priority. Short combinations are completed using the same priorities.</string>
+     <string name="p_custom_card_selection_card_picker_title">Select Command Card</string>
++    <string name="p_custom_card_selection_any_servant">Any servant</string>
+ </resources>
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+index d84251392c30f0df4a1a364c8598af26ad1bd389..c8f3f5cb06a2c6348b0b0baec8c21e7fa0076b57 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCard.kt
+@@ -2,14 +2,26 @@ package io.github.fate_grand_automata.scripts.models
+ 
+ import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
+ 
+-data class CustomCard(val fieldSlot: FieldSlot, val type: CardTypeEnum) {
+-    override fun toString(): String {
+-        val typeChar = when (type) {
+-            CardTypeEnum.Buster -> 'B'
+-            CardTypeEnum.Arts -> 'A'
+-            CardTypeEnum.Quick -> 'Q'
+-            else -> '?'
++sealed class CustomCard {
++    data class Face(
++        val type: CardTypeEnum,
++        val fieldSlot: FieldSlot? = null
++    ) : CustomCard() {
++        override fun toString(): String {
++            val typeChar = when (type) {
++                CardTypeEnum.Buster -> 'B'
++                CardTypeEnum.Arts -> 'A'
++                CardTypeEnum.Quick -> 'Q'
++                else -> '?'
++            }
++            return "$typeChar${fieldSlot?.position ?: ""}"
+         }
+-        return "$typeChar${fieldSlot.position}"
++    }
++
++    data class NoblePhantasm(val fieldSlot: FieldSlot) : CustomCard() {
++        val commandCard: CommandCard.NP
++            get() = CommandCard.NP.list[fieldSlot.position - 1]
++
++        override fun toString() = "N${fieldSlot.position}"
+     }
+ }
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+index e5d8609833e71be5bc5e0673a323ba4206f4ee69..f545583dfe927441c46599e3ecd8e7d986747a10 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/models/CustomCardSelection.kt
+@@ -21,34 +21,49 @@ class CustomCardSelection(
+         }
+ 
+         fun of(selection: String): CustomCardSelection {
+-            val cards = selection
+-                .filter { !it.isWhitespace() }
++            val normalized = selection
++                .filterNot { it.isWhitespace() || it == '+' }
+                 .uppercase()
+-                .chunked(2)
+-                .map {
+-                    when (it.length) {
+-                        2 -> it
+-                        else -> raiseParseError("$customCardSelectionError${it}': Invalid card.")
+-                    }
++            val cards = mutableListOf<CustomCard>()
++            var index = 0
++
++            fun fieldSlot(char: Char, token: String) = when (char) {
++                '1' -> FieldSlot.A
++                '2' -> FieldSlot.B
++                '3' -> FieldSlot.C
++                else -> raiseParseError("$customCardSelectionError$token': Invalid servant field slot.")
++            }
++
++            while (index < normalized.length) {
++                val typeChar = normalized[index]
++                val nextChar = normalized.getOrNull(index + 1)
++                val slot = nextChar?.takeIf { it.isDigit() }?.let {
++                    fieldSlot(it, "$typeChar$it")
+                 }
+-                .map {
+-                    val type = when (it[0]) {
+-                        'B' -> CardTypeEnum.Buster
+-                        'A' -> CardTypeEnum.Arts
+-                        'Q' -> CardTypeEnum.Quick
+-                        else -> raiseParseError("$customCardSelectionError${it}': Invalid card type.")
+-                    }
+-                    val fieldSlot = when (it[1]) {
+-                        '1' -> FieldSlot.A
+-                        '2' -> FieldSlot.B
+-                        '3' -> FieldSlot.C
+-                        else -> raiseParseError("$customCardSelectionError${it}': Invalid servant field slot.")
++
++                val card = when (typeChar) {
++                    'B', 'A', 'Q' -> {
++                        val type = when (typeChar) {
++                            'B' -> CardTypeEnum.Buster
++                            'A' -> CardTypeEnum.Arts
++                            else -> CardTypeEnum.Quick
++                        }
++                        CustomCard.Face(type = type, fieldSlot = slot)
+                     }
+ 
+-                    CustomCard(fieldSlot, type)
++                    'N' -> {
++                        val requiredSlot = slot
++                            ?: raiseParseError("$customCardSelectionError$typeChar': NP must specify servant 1, 2, or 3.")
++                        CustomCard.NoblePhantasm(requiredSlot)
++                    }
+ 
++                    else -> raiseParseError("$customCardSelectionError$typeChar': Invalid card type.")
+                 }
+ 
++                cards += card
++                index += if (slot == null) 1 else 2
++            }
++
+             if (cards.size > 3) {
+                 raiseParseError("$customCardSelectionError': Expected at most 3 cards selected per turn, but ${cards.size} found.")
+             }
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt
+index dfc5e5f7fee76e924a0d3b9b0fe8d7ae7b5c7f1f..892180c338f313c03399fcecf2ca422d33dcaae7 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/ApplyCustomCardSelection.kt
+@@ -1,6 +1,8 @@
+ package io.github.fate_grand_automata.scripts.modules
+ 
+ import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
++import io.github.fate_grand_automata.scripts.models.CustomCard
++import io.github.fate_grand_automata.scripts.models.CommandCard
+ import io.github.fate_grand_automata.scripts.models.ParsedCard
+ import io.github.lib_automata.dagger.ScriptScope
+ import javax.inject.Inject
+@@ -9,26 +11,34 @@ import javax.inject.Inject
+ class ApplyCustomCardSelection @Inject constructor(
+     private val selection: CustomCardSelectionPerTurn
+ ) {
++    data class Match(
++        val commands: List<CommandCard>,
++        val remainingCards: List<ParsedCard>
++    )
++
+     /**
+-     * Puts all selected cards in the front
+-     * Returns null if no selection found
+-     * Returns null if not all selected cards are available
++     * Resolves the configured commands in order without reusing a face card.
++     * Returns null when no custom selection exists or a required face card is unavailable,
++     * allowing the caller to fall back to the existing priority picker.
+      */
+     fun pick(
+         cards: List<ParsedCard>,
+         turn: Int
+-    ): List<ParsedCard>? {
++    ): Match? {
+         val requirements = selection.atTurn(turn)
+         if (requirements.isEmpty()) return null
+ 
+         val available = cards.toMutableList()
+         val picked = requirements.map { requirement ->
+-            available.find {
+-                it.fieldSlot == requirement.fieldSlot && it.type == requirement.type
+-            }?.also { available.remove(it) }
+-                ?: return null
++            when (requirement) {
++                is CustomCard.NoblePhantasm -> requirement.commandCard
++                is CustomCard.Face -> available.find {
++                    it.type == requirement.type &&
++                            (requirement.fieldSlot == null || it.fieldSlot == requirement.fieldSlot)
++                }?.also { available.remove(it) }?.card ?: return null
++            }
+         }
+ 
+-        return picked + available
++        return Match(commands = picked, remainingCards = available)
+     }
+ }
+diff --git a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt
+index 9760857fec25ebd892291e80ff46850cb064b993..8c9afcd74a2c1a8d8e7733ce7c35350321022d57 100644
+--- a/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt
++++ b/scripts/src/main/java/io/github/fate_grand_automata/scripts/modules/Card.kt
+@@ -4,8 +4,6 @@ import io.github.fate_grand_automata.scripts.IFgoAutomataApi
+ import io.github.fate_grand_automata.scripts.ScriptLog
+ import io.github.fate_grand_automata.scripts.enums.BraveChainEnum
+ import io.github.fate_grand_automata.scripts.models.CommandCard
+-import io.github.fate_grand_automata.scripts.models.CustomCardSelection
+-import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+ import io.github.fate_grand_automata.scripts.models.FieldSlot
+ import io.github.fate_grand_automata.scripts.models.NPUsage
+ import io.github.fate_grand_automata.scripts.models.ParsedCard
+@@ -46,13 +44,10 @@ class Card @Inject constructor(
+                 }
+                 .toSet()
+ 
+-    private fun pickCards(
++    private fun pickCardsByPriority(
+         cards: List<ParsedCard>,
+         npUsage: NPUsage
+-    ): List<CommandCard.Face> {
+-        val customSelected = selection.pick(cards, state.currentTurn)?.map { it.card }
+-        if (customSelected != null) return customSelected // Overrides priority order
+-
++    ): List<ParsedCard> {
+         val cardsOrderedByPriority = priority.sort(cards, state.stage)
+ 
+         fun <T> List<T>.inCurrentWave(default: T) =
+@@ -68,14 +63,56 @@ class Card @Inject constructor(
+             npUsage = npUsage,
+             braveChains = braveChainsPerWave.inCurrentWave(BraveChainEnum.None),
+             rearrange = rearrangeCardsPerWave.inCurrentWave(false)
+-        ).map { it.card }
++        )
++    }
++
++    private fun pickFaceCards(
++        cards: List<ParsedCard>,
++        npUsage: NPUsage,
++        customMatch: ApplyCustomCardSelection.Match?
++    ): List<CommandCard.Face> {
++        if (customMatch == null) {
++            return pickCardsByPriority(cards, npUsage).map { it.card }
++        }
++
++        val customFaces = customMatch.commands.filterIsInstance<CommandCard.Face>()
++        val remaining = pickCardsByPriority(customMatch.remainingCards, npUsage)
++            .map { it.card }
++        return customFaces + remaining
++    }
++
++    private fun clickCustomCommands(match: ApplyCustomCardSelection.Match) {
++        val remainingSlots = (3 - match.commands.size).coerceAtLeast(0)
++        val filler = pickCardsByPriority(match.remainingCards, NPUsage.none)
++            .take(remainingSlots)
++            .map { it.card }
++
++        (match.commands + filler).forEach { command ->
++            when (command) {
++                is CommandCard.Face -> {
++                    messages.log(ScriptLog.ClickingCards(listOf(command)))
++                    caster.use(command)
++                }
++
++                is CommandCard.NP -> {
++                    messages.log(ScriptLog.ClickingNPs(listOf(command)))
++                    caster.use(command)
++                }
++            }
++        }
+     }
+ 
+     fun clickCommandCards(
+         cards: List<ParsedCard>,
+         npUsage: NPUsage
+     ) {
+-        val pickedCards = pickCards(cards, npUsage)
++        val customMatch = selection.pick(cards, state.currentTurn)
++        if (customMatch?.commands?.any { it is CommandCard.NP } == true) {
++            clickCustomCommands(customMatch)
++            return
++        }
++
++        val pickedCards = pickFaceCards(cards, npUsage, customMatch)
+             .take(3)
+ 
+         if (npUsage.cardsBeforeNP > 0) {
+@@ -98,4 +135,4 @@ class Card @Inject constructor(
+             .also { messages.log(ScriptLog.ClickingCards(it)) }
+             .forEach { caster.use(it) }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/scripts/src/test/java/io/github/fate_grand_automata/scripts/CustomCardSelectionTest.kt b/scripts/src/test/java/io/github/fate_grand_automata/scripts/CustomCardSelectionTest.kt
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb22dce33af54cf113ed93306cc326c25cb1d403
+--- /dev/null
++++ b/scripts/src/test/java/io/github/fate_grand_automata/scripts/CustomCardSelectionTest.kt
+@@ -0,0 +1,95 @@
++package io.github.fate_grand_automata.scripts
++
++import io.github.fate_grand_automata.scripts.entrypoints.AutoBattle
++import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
++import io.github.fate_grand_automata.scripts.models.CommandCard
++import io.github.fate_grand_automata.scripts.models.CustomCard
++import io.github.fate_grand_automata.scripts.models.CustomCardSelection
++import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
++import io.github.fate_grand_automata.scripts.models.FieldSlot
++import io.github.fate_grand_automata.scripts.models.ParsedCard
++import io.github.fate_grand_automata.scripts.models.TeamSlot
++import io.github.fate_grand_automata.scripts.modules.ApplyCustomCardSelection
++import kotlin.test.Test
++import kotlin.test.assertEquals
++import kotlin.test.assertFailsWith
++import kotlin.test.assertNull
++
++class CustomCardSelectionTest {
++    private val cards = listOf(
++        ParsedCard(CommandCard.Face.A, TeamSlot.A, FieldSlot.A, CardTypeEnum.Buster),
++        ParsedCard(CommandCard.Face.B, TeamSlot.A, FieldSlot.A, CardTypeEnum.Arts),
++        ParsedCard(CommandCard.Face.C, TeamSlot.B, FieldSlot.B, CardTypeEnum.Arts),
++        ParsedCard(CommandCard.Face.D, TeamSlot.C, FieldSlot.C, CardTypeEnum.Quick),
++        ParsedCard(CommandCard.Face.E, TeamSlot.B, FieldSlot.B, CardTypeEnum.Buster)
++    )
++
++    @Test
++    fun parsesNpGenericAndSpecificCards() {
++        val selection = CustomCardSelection.of("N1 + A1 + Q")
++
++        assertEquals(
++            listOf(
++                CustomCard.NoblePhantasm(FieldSlot.A),
++                CustomCard.Face(CardTypeEnum.Arts, FieldSlot.A),
++                CustomCard.Face(CardTypeEnum.Quick)
++            ),
++            selection.toList()
++        )
++        assertEquals("N1A1Q", selection.toString())
++    }
++
++    @Test
++    fun keepsPr2196SyntaxCompatible() {
++        val selection = CustomCardSelection.of("B1A2Q3")
++
++        assertEquals(
++            listOf(
++                CustomCard.Face(CardTypeEnum.Buster, FieldSlot.A),
++                CustomCard.Face(CardTypeEnum.Arts, FieldSlot.B),
++                CustomCard.Face(CardTypeEnum.Quick, FieldSlot.C)
++            ),
++            selection.toList()
++        )
++    }
++
++    @Test
++    fun rejectsInvalidNpAndMoreThanThreeCommands() {
++        assertFailsWith<AutoBattle.BattleExitException> { CustomCardSelection.of("N") }
++        assertFailsWith<AutoBattle.BattleExitException> { CustomCardSelection.of("N4") }
++        assertFailsWith<AutoBattle.BattleExitException> { CustomCardSelection.of("N1ABQ") }
++    }
++
++    @Test
++    fun matchesAnyColorAndSpecificServantInOrder() {
++        val matcher = matcher("N1+A1+Q")
++
++        val match = matcher.pick(cards, turn = 1)!!
++
++        assertEquals(
++            listOf(CommandCard.NP.A, CommandCard.Face.B, CommandCard.Face.D),
++            match.commands
++        )
++        assertEquals(listOf(CommandCard.Face.A, CommandCard.Face.C, CommandCard.Face.E), match.remainingCards.map { it.card })
++    }
++
++    @Test
++    fun consumesDifferentCardsForRepeatedGenericRequirements() {
++        val matcher = matcher("AA")
++
++        val match = matcher.pick(cards, turn = 1)!!
++
++        assertEquals(listOf(CommandCard.Face.B, CommandCard.Face.C), match.commands)
++    }
++
++    @Test
++    fun returnsNullSoExistingPriorityCanHandleIncompleteCombination() {
++        val matcher = matcher("N1+Q1+A")
++
++        assertNull(matcher.pick(cards, turn = 1))
++    }
++
++    private fun matcher(raw: String) = ApplyCustomCardSelection(
++        CustomCardSelectionPerTurn.from(listOf(CustomCardSelection.of(raw)))
++    )
++}
+-- 
+2.54.0.windows.1
+

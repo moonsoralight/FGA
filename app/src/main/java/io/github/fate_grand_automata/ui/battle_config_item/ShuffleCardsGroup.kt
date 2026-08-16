@@ -16,8 +16,10 @@ import io.github.fate_grand_automata.R
 import io.github.fate_grand_automata.prefs.core.BattleConfigCore
 import io.github.fate_grand_automata.scripts.enums.ShuffleCardsEnum
 import io.github.fate_grand_automata.ui.prefs.ListPreference
+import io.github.fate_grand_automata.ui.prefs.MultiSelectChipPreference
 import io.github.fate_grand_automata.ui.prefs.PreferenceGroupHeader
 import io.github.fate_grand_automata.ui.prefs.StepperPreference
+import io.github.fate_grand_automata.ui.prefs.SwitchPreference
 import io.github.fate_grand_automata.ui.prefs.remember
 import io.github.fate_grand_automata.util.stringRes
 
@@ -59,6 +61,30 @@ fun ShuffleCardsGroup(config: BattleConfigCore) {
                         modifier = Modifier.weight(1f)
                     )
                 }
+            }
+
+            config.hakunoShuffleEnabled.SwitchPreference(
+                title = stringResource(R.string.p_hakuno_shuffle),
+                summary = stringResource(R.string.p_hakuno_shuffle_summary)
+            )
+
+            val hakunoEnabled by config.hakunoShuffleEnabled.remember()
+            if (hakunoEnabled) {
+                config.hakunoShuffleAutoDetect.SwitchPreference(
+                    title = stringResource(R.string.p_hakuno_shuffle_auto_detect),
+                    summary = stringResource(R.string.p_hakuno_shuffle_auto_detect_summary)
+                )
+                val autoDetect by config.hakunoShuffleAutoDetect.remember()
+                if (!autoDetect) {
+                    config.hakunoShuffleManualSlot.ListPreference(
+                        title = stringResource(R.string.p_hakuno_shuffle_manual_slot),
+                        entries = (1..3).associateWith { it.toString() }
+                    )
+                }
+                config.hakunoShuffleWaves.MultiSelectChipPreference(
+                    title = "Waves",
+                    entries = (1..3).associateWith { it.toString() }
+                )
             }
         }
     }

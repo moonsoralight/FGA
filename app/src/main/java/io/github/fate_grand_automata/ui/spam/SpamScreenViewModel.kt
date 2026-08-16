@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.fate_grand_automata.prefs.core.BattleConfigCore
 import io.github.fate_grand_automata.scripts.enums.SpamEnum
 import io.github.fate_grand_automata.scripts.models.NpSpamConfig
+import io.github.fate_grand_automata.scripts.models.MasterSpamConfig
 import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
 import io.github.fate_grand_automata.scripts.models.SkillSpamConfig
 import io.github.fate_grand_automata.scripts.models.SkillSpamTarget
@@ -52,6 +53,24 @@ class SpamScreenViewModel @Inject constructor(
                 }
             )
         }
+
+    data class MasterSpamState(
+        val skills: List<SkillSpamState>,
+        val reviveWithCommandSpells: MutableState<Boolean>
+    )
+
+    val masterSpamState = battleConfig.masterSpam.let { config ->
+        MasterSpamState(
+            skills = config.skills.map { skill ->
+                SkillSpamState(
+                    spamMode = mutableStateOf(skill.spam),
+                    target = mutableStateOf(skill.target),
+                    waves = mutableStateOf(skill.waves)
+                )
+            },
+            reviveWithCommandSpells = mutableStateOf(config.reviveWithCommandSpells)
+        )
+    }
 
     data class SpamPreset(val name: String, val action: (List<SpamState>) -> Unit)
 
@@ -99,5 +118,17 @@ class SpamScreenViewModel @Inject constructor(
                 }
             )
         }
+
+        battleConfig.masterSpam = MasterSpamConfig(
+            skills = masterSpamState.skills.map { skill ->
+                SkillSpamConfig(
+                    spam = skill.spamMode.value,
+                    target = skill.target.value,
+                    waves = skill.waves.value
+                )
+            },
+            reviveWithCommandSpells = masterSpamState.reviveWithCommandSpells.value
+        )
     }
+
 }

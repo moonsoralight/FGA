@@ -16,6 +16,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,12 @@ fun LazyListScope.advancedGroup(
     }
 
     item {
+        val debugMode by prefs.debugMode.remember()
+        LaunchedEffect(debugMode) {
+            if (!debugMode) {
+                prefs.dreamFireTestMode.set(false)
+            }
+        }
         prefs.debugMode.SwitchPreference(
             title = stringResource(R.string.p_debug_mode),
             summary = stringResource(R.string.p_debug_mode_summary),

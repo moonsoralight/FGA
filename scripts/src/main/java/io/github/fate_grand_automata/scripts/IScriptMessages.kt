@@ -14,6 +14,7 @@ sealed class ScriptNotify {
     class SupportListUpdatingIn(val time: Duration) : ScriptNotify()
     class BetweenRuns(val refills: Int, val runs: Int, val ceDrops: Int) : ScriptNotify()
     data object BondLevelUp : ScriptNotify()
+    class Alert(val message: String) : ScriptNotify()
 }
 
 sealed class ScriptLog {

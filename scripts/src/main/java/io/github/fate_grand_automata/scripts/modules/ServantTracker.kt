@@ -242,6 +242,37 @@ class ServantTracker @Inject constructor(
     }
 
     /**
+     * Detects which of the three fixed NP cards are actually visible on the attack screen.
+     *
+     * This deliberately reuses the same servant portrait templates and support-marker path as
+     * face-card ownership detection. A configured N1/N2/N3 therefore matches only when the NP
+     * card belonging to the Servant currently deployed in that field slot is present.
+     */
+    fun availableNps(): Set<CommandCard.NP> {
+        if (prefs.skipServantFaceCardCheck) return emptySet()
+
+        return FieldSlot.list.zip(CommandCard.NP.list)
+            .mapNotNullTo(mutableSetOf()) { (fieldSlot, np) ->
+                val teamSlot = deployed[fieldSlot] ?: return@mapNotNullTo null
+
+                val isVisible = if (teamSlot == supportSlot) {
+                    images[Images.Support] in locations.attack.npSupportCheckRegion(np)
+                } else {
+                    faceCardImages[teamSlot]
+                        .orEmpty()
+                        .maxOfOrNull { image ->
+                            locations.attack.npServantMatchRegion(np)
+                                .find(image, 0.5)?.score ?: 0.0
+                        }
+                        ?.let { it > 0.0 }
+                        ?: false
+                }
+
+                np.takeIf { isVisible }
+            }
+    }
+
+    /**
      * Adds the 3rd Ascension Melusine image to the existing 1st/2nd Ascension
      * image so both are detected as the same Servant.
      */

@@ -1,0 +1,142 @@
+From c283a919eba092dbe8306ca04fefa7bd66b30b4a Mon Sep 17 00:00:00 2001
+From: sheng-28 <lishengsheng28@gmail.com>
+Date: Fri, 13 Mar 2026 17:40:15 +1100
+Subject: [PATCH 3/5] Add entries to localized.xml
+
+---
+ .../battle_config_item/BattleConfigScreen.kt  |  2 +-
+ .../CustomCardSelectionTurnItem.kt            |  3 +-
+ .../CustomCardSelectionView.kt                | 41 ++++++++++++++++++-
+ app/src/main/res/values/localized.xml         |  4 ++
+ 4 files changed, 47 insertions(+), 3 deletions(-)
+
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+index c4ddd26e0a3a5dfff3d6bb873928733b57f890dd..24b6ba5a30771c7172d42a9c83a03f021c0c812c 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/battle_config_item/BattleConfigScreen.kt
+@@ -257,7 +257,7 @@ private fun BattleConfigContent(
+                             
+                             customCardSelection?.let {
+                                 Preference(
+-                                    title = { Text("Custom Card Selection") },
++                                    title = { Text(stringResource(R.string.p_custom_card_selection)) },
+                                     summary = { CustomCardSelectionSummary(it) },
+                                     onClick = { navigate(BattleConfigDestination.CustomCardSelection) }
+                                 )
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+index 69dc938667a8782377deff1dacd94d89fca69d9b..bcc732d40d63bd0ef4ce9dd039791f8700329511 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionTurnItem.kt
+@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.res.colorResource
++import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.unit.dp
+@@ -113,7 +114,7 @@ private fun CardPicker(
+                 horizontalAlignment = Alignment.CenterHorizontally
+             ) {
+                 Text(
+-                    "Select Command Card",
++                    stringResource(R.string.p_custom_card_selection_card_picker_title),
+                     style = MaterialTheme.typography.titleMedium,
+                     modifier = Modifier.padding(bottom = 16.dp)
+                 )
+diff --git a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt
+index 74afd45823572257dd85a319061c86c29a076e38..f56bda6fefd0e8e610c2f64433451db7010cf2b2 100644
+--- a/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt
++++ b/app/src/main/java/io/github/fate_grand_automata/ui/custom_card_selection/CustomCardSelectionView.kt
+@@ -2,6 +2,7 @@ package io.github.fate_grand_automata.ui.custom_card_selection
+ 
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.padding
+@@ -9,13 +10,21 @@ import androidx.compose.foundation.pager.HorizontalPager
+ import androidx.compose.foundation.pager.rememberPagerState
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.verticalScroll
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Info
+ import androidx.compose.material3.HorizontalDivider
++import androidx.compose.material3.IconButton
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.rememberCoroutineScope
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.res.stringResource
+ import androidx.compose.ui.unit.dp
++import io.github.fate_grand_automata.R
+ import io.github.fate_grand_automata.ui.Heading
++import io.github.fate_grand_automata.ui.DimmedIcon
++import io.github.fate_grand_automata.ui.dialog.FgaDialog
++import io.github.fate_grand_automata.ui.icon
+ import kotlinx.coroutines.launch
+ 
+ @Composable
+@@ -24,6 +33,21 @@ fun CustomCardSelectionView(
+ ) {
+     val pagerState = rememberPagerState(pageCount = { vm.turnSelections.size })
+     val scope = rememberCoroutineScope()
++    val infoDialog = FgaDialog()
++
++    infoDialog.build {
++        title(stringResource(R.string.p_custom_card_selection))
++        message(stringResource(R.string.p_custom_card_selection_dialog_message))
++        /**
++         * "Define specific cards to use for each turn of the battle.\n\n" +
++         *                 "If the cards selected are present in available cards, the script will click them in the exact order as defined.\n\n" +
++         *                 "If even one of your required cards is missing from the hand, the script will ignore the custom selection and fall back to Card Priority settings.\n\n" +
++         *                 "If selected cards are less than 3, more cards would be picked from rest automatically."*/
++        buttons(
++            onSubmit = { },
++            showCancel = false
++        )
++    }
+ 
+     Box(
+         modifier = Modifier.fillMaxSize()
+@@ -33,7 +57,22 @@ fun CustomCardSelectionView(
+                 .fillMaxWidth()
+                 .verticalScroll(rememberScrollState())
+         ) {
+-            Heading("Custom Card Selection")
++            Row(
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                Heading(
++                    text = "Custom Card Selection"
++                )
++
++                IconButton(
++                    onClick = { infoDialog.show() }
++                ) {
++                    DimmedIcon(
++                        icon(Icons.Default.Info),
++                        contentDescription = "Info"
++                    )
++                }
++            }
+ 
+             CustomCardSelectionTurnSelector(
+                 numberOfTurns = vm.turnSelections.size,
+diff --git a/app/src/main/res/values/localized.xml b/app/src/main/res/values/localized.xml
+index 75aacc6b76d246f19883fc9859b595330413ac96..913a34a52d90f593333d798c28796c99e6a37649 100644
+--- a/app/src/main/res/values/localized.xml
++++ b/app/src/main/res/values/localized.xml
+@@ -491,4 +491,8 @@ After pressing on the button, switch the app filter from \"Not optimized\" to \"
+     <string name="state_off">Off</string>
+     <string name="save">Save</string>
+     <string name="reset">Reset</string>
++
++    <string name="p_custom_card_selection">Custom Card Selection</string>
++    <string name="p_custom_card_selection_dialog_message">Define specific cards to use for each turn of the battle.\n\nIf the cards selected are present in available cards, the script will click them in the exact order as defined.\n\nIf even one of your required cards is missing from the hand, the script will ignore the custom selection and fall back to Card Priority settings.\n\nIf selected cards are less than 3, more cards would be picked from rest automatically.</string>
++    <string name="p_custom_card_selection_card_picker_title">Select Command Card</string>
+ </resources>
+-- 
+2.54.0.windows.1
+

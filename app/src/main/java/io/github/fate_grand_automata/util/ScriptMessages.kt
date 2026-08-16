@@ -143,6 +143,7 @@ class ScriptMessages @Inject constructor(
                     context.getString(R.string.bond_level_up)
                 )
             }
+            is ScriptNotify.Alert -> notify(action.message)
         }
 
     private fun makeRefillAndRunsMessage(

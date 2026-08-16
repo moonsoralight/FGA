@@ -17,6 +17,7 @@ import io.github.fate_grand_automata.scripts.modules.Refill
 import io.github.fate_grand_automata.scripts.modules.ScreenshotDrops
 import io.github.fate_grand_automata.scripts.modules.Support
 import io.github.fate_grand_automata.scripts.modules.Withdraw
+import io.github.fate_grand_automata.scripts.modules.AutoDreamFire
 import io.github.fate_grand_automata.scripts.prefs.IPreferences
 import io.github.lib_automata.EntryPoint
 import io.github.lib_automata.ExitManager
@@ -55,7 +56,8 @@ class AutoBattle @Inject constructor(
     private val connectionRetry: ConnectionRetry,
     private val refill: Refill,
     private val matTracker: MaterialsTracker,
-    private val ceDropsTracker: CEDropsTracker
+    private val ceDropsTracker: CEDropsTracker,
+    private val autoDreamFire: AutoDreamFire
 ) : EntryPoint(exitManager), IFgoAutomataApi by api {
     sealed class ExitReason(val cause: Exception? = null) {
         data object Abort : ExitReason()
@@ -67,13 +69,16 @@ class AutoBattle @Inject constructor(
         data object WithdrawDisabled : ExitReason()
         data object APRanOut : ExitReason()
         data object InventoryFull : ExitReason()
+        data object CommandSpellReviveFailed : ExitReason()
         class LimitRuns(val count: Int) : ExitReason()
         data object SupportSelectionManual : ExitReason()
         data object SupportSelectionPreferredNotSet : ExitReason()
         class SkillCommandParseError(cause: Exception) : ExitReason(cause)
         class CardPriorityParseError(val msg: String) : ExitReason()
+        class CustomCardSelectionParseError(val msg: String) : ExitReason()
         data object Paused : ExitReason()
         data object StopAfterThisRun : ExitReason()
+        class AutoDreamFireFailed(val msg: String) : ExitReason()
     }
 
     internal class BattleExitException(val reason: ExitReason) : Exception(reason.cause)
@@ -88,6 +93,11 @@ class AutoBattle @Inject constructor(
     // for tracking whether to check for servant death and wave transition animations
     private var isInBattle = false
 
+    // The bond report is the first result page. Its generic result marker can become visible
+    // before the dedicated bond marker/text has finished rendering, so result() must not start
+    // rapid-clicking until the Dream Fire check has had one chance to observe that page.
+    private var hasCheckedDreamFireBondResult = false
+
 
     private var canScreenshotBondCE = false
 
@@ -95,6 +105,17 @@ class AutoBattle @Inject constructor(
 
     override fun script(): Nothing {
         try {
+            if (prefs.dreamFireTestMode) {
+                try {
+                    autoDreamFire.executeTestFromServantPicker()
+                    showRefillsAndRunsMessage()
+                    afterSelectingQuest()
+                } catch (e: AutoDreamFire.Failure) {
+                    throw BattleExitException(
+                        ExitReason.AutoDreamFireFailed(e.message ?: "梦火测试失败")
+                    )
+                }
+            }
             loop()
         } catch (e: BattleExitException) {
             throw ExitException(e.reason, makeExitState())
@@ -108,6 +129,7 @@ class AutoBattle @Inject constructor(
             refill.autoDecrement()
             matTracker.autoDecrement()
             ceDropsTracker.autoDecrement()
+            autoDreamFire.close()
 
             val perServerConfigPref = prefs.selectedServerConfigPref
 
@@ -178,17 +200,23 @@ class AutoBattle @Inject constructor(
             { connectionRetry.needsToRetry() } to { connectionRetry.retry() },
             { battle.isIdle() } to {
                 storySkipPossible = false
+                if (!isInBattle) {
+                    hasCheckedDreamFireBondResult = false
+                }
                 isInBattle = true
                 battle.performBattle()
             },
             { isInMenu() } to { menu() },
             { isStartingNp() } to { skipNp() },
+            // Insert Auto Dream Fire immediately after FGA's original result detector succeeds.
+            // When disabled this validator is false, so the original dispatch order is unchanged.
+            { shouldCheckDreamFireResult() } to { checkDreamFireResult() },
             { isInBondScreen() } to { handleBondScreen() },
             { isInResult() } to { result() },
             { isInDropsScreen() } to { dropScreen() },
             { isInQuestRewardScreen() } to { questReward() },
             { isInSupport() } to { support() },
-            { isRepeatScreen() } to { repeatQuest() },
+            { isRepeatScreen() } to { handleRepeatScreen() },
             { isInOrdealCallOutOfPodsScreen() } to { ordealCallOutOfPods() },
             { isInInterludeEndScreen() } to { locations.interludeCloseClick.click() },
             { withdraw.needsToWithdraw() } to { withdraw.withdraw() },
@@ -326,6 +354,22 @@ class AutoBattle @Inject constructor(
         storySkipPossible = true
     }
 
+    /**
+     * Uses FGA's existing isInResult() as the only Auto Dream Fire trigger. The check is placed
+     * before the original bond/result actors, so no result click can dismiss the first reward
+     * page while the bounded grayscale comparison is running. Once complete, the next loop
+     * resumes FGA's original dispatch order unchanged.
+     */
+    private fun shouldCheckDreamFireResult() =
+        prefs.autoDreamFireEnabled &&
+                !hasCheckedDreamFireBondResult &&
+                isInResult()
+
+    private fun checkDreamFireResult() {
+        hasCheckedDreamFireBondResult = true
+        autoDreamFire.recordCappedOwnedServants()
+    }
+
     private fun isInDropsScreen() =
         images[Images.MatRewards] in locations.resultMatRewardsRegion
 
@@ -394,6 +438,24 @@ class AutoBattle @Inject constructor(
 
         // If Stamina is empty, follow same protocol as is in "Menu" function Auto refill.
         afterSelectingQuest()
+    }
+
+    private fun handleRepeatScreen() {
+        if (!autoDreamFire.hasPending) {
+            repeatQuest()
+            return
+        }
+
+        try {
+            isContinuing = false
+            storySkipPossible = false
+            battle.resetState()
+            autoDreamFire.executeFromRepeatScreen()
+            showRefillsAndRunsMessage()
+            afterSelectingQuest()
+        } catch (e: AutoDreamFire.Failure) {
+            throw BattleExitException(ExitReason.AutoDreamFireFailed(e.message ?: "自动梦火失败"))
+        }
     }
 
     private fun isFriendRequestScreen() =

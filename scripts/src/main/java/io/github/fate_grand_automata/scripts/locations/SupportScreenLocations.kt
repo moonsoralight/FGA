@@ -39,6 +39,16 @@ class SupportScreenLocations @Inject constructor(
 
     val listRegion = Region(-24, 332, 378, 1091) + supportOffset
     val grandCeListRegion = Region(335, 332,342, 1091) + supportOffset
+    /**
+     * CN Grand-support label search band.
+     *
+     * The marked source capture is 2736 x 1264. Its inner red-line edges are
+     * x = 651 and x = 822. After conversion to FGA's 2560 x 1440 script space
+     * and removal of the dynamic wide-screen support offset, that becomes
+     * x = 326, width = 195. Image matching still happens in FGA's 1280 x 720
+     * comparison space through the normal script-area transform.
+     */
+    val cnGrandCeLabelListRegion = Region(326, 0, 195, 1440) + supportOffset
     val bondCeRegion = Region(348, 192, 53, 55) + supportOffset
     val grandCeLabelRegion = Region(335, 0,  60, 60) + supportOffset
     val grandCeRegion1 = Region(346, 100, 320, 94) + supportOffset

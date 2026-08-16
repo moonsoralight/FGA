@@ -20,6 +20,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -53,7 +54,7 @@ fun SpamScreen(
         }
     }
 
-    val pagerState = rememberPagerState(pageCount = {vm.spamStates.size})
+    val pagerState = rememberPagerState(pageCount = {vm.spamStates.size + 1})
     val scope = rememberCoroutineScope()
 
     LazyColumn {
@@ -80,8 +81,8 @@ fun SpamScreen(
                     modifier = Modifier.padding(end = 16.dp)
                 )
 
-                (1..vm.spamStates.size).map {
-                    val isSelected = pagerState.currentPage == it - 1
+                (0..vm.spamStates.size).map { page ->
+                    val isSelected = pagerState.currentPage == page
 
                     Box(
                         modifier = Modifier
@@ -89,11 +90,11 @@ fun SpamScreen(
                                 color = if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent,
                                 shape = MaterialTheme.shapes.medium
                             )
-                            .clickable { scope.launch { pagerState.animateScrollToPage(it - 1) } }
+                            .clickable { scope.launch { pagerState.animateScrollToPage(page) } }
                             .padding(14.dp, 5.dp)
                     ) {
                         Text(
-                            it.toString(),
+                            if (page < vm.spamStates.size) "${page + 1}" else "Master",
                             color = if (isSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -108,9 +109,14 @@ fun SpamScreen(
                 state = pagerState,
                 verticalAlignment = Alignment.Top,
             ) {
-                SpamView(
-                    selectedConfig = vm.spamStates[it]
-                )
+                if (it < vm.spamStates.size) {
+                    SpamView(
+                        vm = vm,
+                        selectedConfig = vm.spamStates[it]
+                    )
+                } else {
+                    MasterSpamView(vm = vm, selectedConfig = vm.masterSpamState)
+                }
             }
         }
 
@@ -197,6 +203,7 @@ private fun SkillSpamView(
 
         if (selectedSpamMode != SpamEnum.None) {
             SelectTarget(
+                title = stringResource(R.string.spam_cast_target),
                 selected = selectedTarget,
                 onSelectChange = { selectedTarget = it },
                 modifier = Modifier.weight(1f)
@@ -213,6 +220,7 @@ private fun SkillSpamView(
 
 @Composable
 private fun SpamView(
+    vm: SpamScreenViewModel,
     selectedConfig: SpamScreenViewModel.SpamState
 ) {
     Column {
@@ -252,6 +260,43 @@ private fun SpamView(
 }
 
 @Composable
+private fun MasterSpamView(
+    vm: SpamScreenViewModel,
+    selectedConfig: SpamScreenViewModel.MasterSpamState
+) {
+    Column {
+        var reviveWithCommandSpells by selectedConfig.reviveWithCommandSpells
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.spam_command_spells)) },
+            supportingContent = { Text(stringResource(R.string.spam_command_spells_summary)) },
+            trailingContent = {
+                Switch(
+                    checked = reviveWithCommandSpells,
+                    onCheckedChange = { reviveWithCommandSpells = it }
+                )
+            },
+            modifier = Modifier.clickable { reviveWithCommandSpells = !reviveWithCommandSpells },
+            colors = FGAListItemColors()
+        )
+
+        Card(
+            modifier = Modifier.padding(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        ) {
+            Column {
+                selectedConfig.skills.forEachIndexed { index, skillConfig ->
+                    if (index != 0) HorizontalDivider()
+                    SkillSpamView(index = index, skillConfig = skillConfig)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SelectSpamMode(
     selected: SpamEnum,
     onSelectChange: (SpamEnum) -> Unit,
@@ -267,14 +312,14 @@ private fun SelectSpamMode(
     ListItem(
         headlineContent = { Text(stringResource(R.string.spam)) },
         supportingContent = { Text(stringResource(selected.stringRes)) },
-        modifier = modifier
-            .clickable { dialog.show() },
+        modifier = modifier.clickable { dialog.show() },
         colors = FGAListItemColors()
     )
 }
 
 @Composable
 private fun SelectTarget(
+    title: String,
     selected: SkillSpamTarget,
     onSelectChange: (SkillSpamTarget) -> Unit,
     modifier: Modifier = Modifier
@@ -283,11 +328,11 @@ private fun SelectTarget(
         selected = selected,
         onSelectedChange = onSelectChange,
         entries = SkillSpamTarget.entries.associateWith { it.toString() },
-        title = stringResource(R.string.spam_target)
+        title = title
     )
 
     ListItem(
-        headlineContent = { Text(stringResource(R.string.spam_target)) },
+        headlineContent = { Text(title) },
         supportingContent = { Text(selected.toString()) },
         modifier = modifier
             .clickable { dialog.show() },

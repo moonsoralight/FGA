@@ -85,6 +85,13 @@ class PreferencesImpl @Inject constructor(
 
     override val screenshotBond by prefs.screenshotBond
 
+    override val autoDreamFireEnabled by prefs.autoDreamFireEnabled
+    override val dreamFireTestMode by prefs.dreamFireTestMode
+    override val dreamFireBondWaitSeconds by prefs.dreamFireBondWaitSeconds
+    override val dreamFireLevel1Image by prefs.dreamFireLevel1Image
+    override val dreamFireLevel2Image by prefs.dreamFireLevel2Image
+    override val dreamFireHasMap by prefs.dreamFireHasMap
+
     override var hidePlayButton by prefs.hidePlayButton
 
     override val hideSQInAPResources by prefs.hideSQInAPResources

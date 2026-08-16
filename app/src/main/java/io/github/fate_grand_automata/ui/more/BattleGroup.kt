@@ -6,19 +6,24 @@ import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.NoAccounts
 import androidx.compose.material.icons.filled.OfflineBolt
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import io.github.fate_grand_automata.R
 import io.github.fate_grand_automata.prefs.core.PrefsCore
 import io.github.fate_grand_automata.scripts.enums.GameServer
 import io.github.fate_grand_automata.ui.icon
 import io.github.fate_grand_automata.ui.prefs.ListPreference
+import io.github.fate_grand_automata.ui.prefs.remember
 import io.github.fate_grand_automata.ui.prefs.SingleSelectChipPreference
+import io.github.fate_grand_automata.ui.prefs.StepperPreference
 import io.github.fate_grand_automata.ui.prefs.SwitchPreference
 import io.github.fate_grand_automata.util.stringRes
 
 fun LazyListScope.battleGroup(
-    prefs: PrefsCore
+    prefs: PrefsCore,
+    questImages: List<String>
 ) {
     item {
         prefs.gameServerRaw.ListPreference(
@@ -84,6 +89,59 @@ fun LazyListScope.battleGroup(
             title = stringResource(R.string.p_screenshot_bond),
             summary = stringResource(R.string.p_screenshot_bond_summary),
             icon = icon(R.drawable.ic_screenshot)
+        )
+    }
+
+    item {
+        prefs.autoDreamFireEnabled.SwitchPreference(
+            title = stringResource(R.string.p_auto_dream_fire),
+            summary = stringResource(R.string.p_auto_dream_fire_summary),
+            icon = icon(Icons.Default.LocalFireDepartment)
+        )
+    }
+
+    item {
+        val debugMode by prefs.debugMode.remember()
+        if (debugMode) {
+            prefs.dreamFireTestMode.SwitchPreference(
+                title = stringResource(R.string.p_dream_fire_test_mode),
+                summary = stringResource(R.string.p_dream_fire_test_mode_summary),
+                icon = icon(Icons.Default.LocalFireDepartment)
+            )
+        }
+    }
+
+    item {
+        val secondsUnit = stringResource(R.string.p_seconds_unit)
+        prefs.dreamFireBondWaitSeconds.StepperPreference(
+            title = stringResource(R.string.p_dream_fire_bond_wait_seconds),
+            valueRange = 1..10,
+            valueRepresentation = { "$it $secondsUnit" }
+        )
+    }
+
+    item {
+        prefs.dreamFireLevel1Image.ListPreference(
+            title = stringResource(R.string.p_dream_fire_level1_image),
+            entries = listOf("").plus(questImages).associateWith {
+                it.ifBlank { stringResource(R.string.p_not_set) }
+            }
+        )
+    }
+
+    item {
+        prefs.dreamFireLevel2Image.ListPreference(
+            title = stringResource(R.string.p_dream_fire_level2_image),
+            entries = listOf("").plus(questImages).associateWith {
+                it.ifBlank { stringResource(R.string.p_not_set) }
+            }
+        )
+    }
+
+    item {
+        prefs.dreamFireHasMap.SwitchPreference(
+            title = stringResource(R.string.p_dream_fire_has_map),
+            summary = stringResource(R.string.p_dream_fire_has_map_summary)
         )
     }
 

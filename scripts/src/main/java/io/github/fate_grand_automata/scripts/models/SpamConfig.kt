@@ -28,6 +28,14 @@ data class ServantSpamConfig(
     val np: NpSpamConfig = NpSpamConfig()
 )
 
+data class MasterSpamConfig(
+    val skills: List<SkillSpamConfig> = (1..3).map { SkillSpamConfig() },
+    val reviveWithCommandSpells: Boolean = false
+)
+
+fun Set<Int>.includesSpamWave(wave: Int): Boolean =
+    wave in this || (wave > 3 && 3 in this)
+
 class SpamConfigPerTeamSlot(
     private val config: List<ServantSpamConfig>
 ) {

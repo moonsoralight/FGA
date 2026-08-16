@@ -12,6 +12,10 @@ interface IImageLoader {
 
     fun loadMaterial(material: MaterialEnum): Pattern
 
+    fun loadQuestPattern(name: String, deviceToCompareScale: Double): Pattern
+
+    fun loadDreamFireMarkerPatterns(): List<Pattern>
+
     fun clearImageCache()
 
     fun clearSupportCache()

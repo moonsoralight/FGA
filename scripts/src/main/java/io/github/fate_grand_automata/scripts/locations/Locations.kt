@@ -63,6 +63,10 @@ class Locations @Inject constructor(
     val withdrawRegion = Region(-880, 540, 1800, 333).xFromCenter()
     val withdrawAcceptClick = Location(485, 720).xFromCenter()
     val withdrawCloseClick = Location(-10, 1140).xFromCenter()
+    val commandSpellReviveRegion = Region(-360, 520, 720, 240).xFromCenter()
+    val commandSpellReviveClick = Location(0, 645).xFromCenter()
+    val commandSpellReviveConfirmRegion = Region(0, 520, 900, 500).xFromCenter()
+    val commandSpellReviveConfirmClick = Location(350, 790).xFromCenter()
 
     fun locate(refillResource: RefillResourceEnum): List<Location> {
         //scroll bar click location
@@ -129,6 +133,73 @@ class Locations @Inject constructor(
     val rankUpRegion = Region(270, 730, 220, 340).xFromCenter()
 
     val middleOfScreenClick = Location(0, 720).xFromCenter()
+
+    // Auto Chaldean Flame.
+    val dreamFireTopLeftRegion = Region(80, 0, 390, 145)
+    val dreamFireTopLeftClick = Location(250, 75)
+    val dreamFireStrengthenClick = Location(-155, 1260).xFromCenter()
+    val dreamFireEnhancementTextRegion = Region(-1250, 120, 1200, 1160).xFromRight()
+    val dreamFireEnhancementSwipeStart = Location(-170, 330).xFromRight()
+    val dreamFireEnhancementSwipeEnd = Location(-170, 1110).xFromRight()
+    val dreamFireBondUnlockClick = Location(-630, 400).xFromRight()
+    val dreamFirePlusClick = Location(545, 700)
+    val dreamFirePickerCells: List<Region> = listOf(365, 635, 905, 1175, 1445, 1715, 1985).flatMap { x ->
+        listOf(260, 625, 990).map { y -> Region(x, y, 245, 315) }
+    }
+    val dreamFirePickerSwipeStart = Location(-190, 1110).xFromRight()
+    val dreamFirePickerSwipeEnd = Location(-190, 310).xFromRight()
+    val dreamFireOpenClick = Location(-315, -145).xFromRight().yFromBottom()
+    val dreamFireConfirmClick = Location(330, 950).xFromCenter()
+    val dreamFireAnimationClick = Location(0, 720).xFromCenter()
+    val dreamFireListSwipeStart = Location(-170, 1110).xFromRight()
+    val dreamFireListSwipeEnd = Location(-170, 310).xFromRight()
+
+    // Auto Dream Fire v2. All coordinates are in FGA's 2560x1440 script space and are
+    // transformed by the normal game-area scaler at runtime.
+    val dreamFireBondCapLane = Region(-1200, 930, 2400, 190).xFromCenter()
+    val dreamFireMenuRegion = Region(-580, 1180, 500, 220).xFromRight()
+    val dreamFireStrengthenRegion = Region(1080, 1000, 430, 380)
+    val dreamFireStrengthenTitleRegion = Region(-520, 0, 520, 190).xFromRight()
+    val dreamFireEnhancementListRegion = Region(-1500, 120, 1450, 1200).xFromRight()
+    // Keep every Auto Dream Fire gesture inside the same safe vertical lane, but use only
+    // half of the former 810-unit travel. Smaller steps prevent narrow entrance rows from
+    // jumping completely past their comparison region on high-resolution devices.
+    val dreamFireSafeSwipeStart = Location(-650, 1110).xFromRight()
+    val dreamFireSafeSwipeEnd = Location(-650, 705).xFromRight()
+    val dreamFireSafeSwipeDownStart = dreamFireSafeSwipeEnd
+    val dreamFireSafeSwipeDownEnd = dreamFireSafeSwipeStart
+    val dreamFirePlusRegion = Region(480, 540, 460, 480)
+    val dreamFireEligibleLane = Region(420, 500, 2050, 220)
+    val dreamFireOpenRegion = Region(-700, -270, 620, 240).xFromRight().yFromBottom()
+    val dreamFireConfirmButtonRegion = Region(120, 1060, 620, 250).xFromCenter()
+    // Dedicated top-left "关闭" search area shared by the servant picker and the empty '+' page.
+    // Keeping this tight avoids matching unrelated close text elsewhere on enhancement screens.
+    val dreamFireBackRegion = Region(240, 20, 320, 140)
+    val dreamFireTerminalRegion = Region(420, 1020, 420, 360)
+    val dreamFireNotificationRegion = Region(80, 0, 520, 190)
+    val dreamFireRightHalfRegion = Region(
+        scriptArea.center.x,
+        scriptArea.y,
+        scriptArea.right - scriptArea.center.x,
+        scriptArea.height
+    )
+    // Level-1 entrance search excludes the notification panel in the upper-right. The source
+    // reference is a 2736x1264 device screenshot; its marked panel ends at about y=480, which
+    // maps to y=547 in FGA's 2560x1440 script coordinates. Round to 550 and keep the entire
+    // remaining right half searchable. Level-2 entrance search intentionally uses the full
+    // [dreamFireRightHalfRegion].
+    val dreamFireLevel1SearchRegion = Region(
+        scriptArea.center.x,
+        550,
+        scriptArea.right - scriptArea.center.x,
+        scriptArea.bottom - 550
+    )
+    val dreamFireScrollbarRegion = Region(-120, 130, 120, 1180).xFromRight()
+    val dreamFireScrollbarBottomRegion = Region(-120, 1010, 120, 350).xFromRight()
+    val dreamFireMapRegion = scriptArea
+    val dreamFireQuestConfirmRegion = Region(0, 120, 460, 1240).xFromCenter()
+    val dreamFireMapClickOffset = Location(-170, -80)
+    val dreamFireQuestClickOffset = Location(380, 120)
 
     /**
      * The following region are used for the various enhancement screen listed below:

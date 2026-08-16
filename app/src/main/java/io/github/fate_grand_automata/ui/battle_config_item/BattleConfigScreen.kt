@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,14 +34,19 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.fate_grand_automata.R
 import io.github.fate_grand_automata.prefs.core.BattleConfigCore
+import io.github.fate_grand_automata.scripts.enums.CardTypeEnum
 import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.CardScore
+import io.github.fate_grand_automata.scripts.models.CustomCard
+import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
 import io.github.fate_grand_automata.ui.Heading
 import io.github.fate_grand_automata.ui.HeadingButton
 import io.github.fate_grand_automata.ui.VerticalDivider
@@ -80,6 +86,7 @@ fun BattleConfigScreen(
 sealed class BattleConfigDestination {
     object SkillMaker : BattleConfigDestination()
     object CardPriority : BattleConfigDestination()
+    object CustomCardSelection : BattleConfigDestination()
     object Spam : BattleConfigDestination()
     object PreferredSupport : BattleConfigDestination()
     object Back : BattleConfigDestination()
@@ -245,6 +252,18 @@ private fun BattleConfigContent(
                                     onClick = { navigate(BattleConfigDestination.CardPriority) }
                                 )
                             }
+
+                            HorizontalDivider()
+
+                            val customCardSelection by vm.customCardSelection.collectAsState(CustomCardSelectionPerTurn.empty)
+                            
+                            customCardSelection?.let {
+                                Preference(
+                                    title = { Text(stringResource(R.string.p_custom_card_selection)) },
+                                    summary = { CustomCardSelectionSummary(it) },
+                                    onClick = { navigate(BattleConfigDestination.CustomCardSelection) }
+                                )
+                            }
                         }
                     }
                 }
@@ -271,6 +290,93 @@ private val CardScore.color: Color
     @Composable get() {
         return colorResource(getColorRes())
     }
+
+private val CustomCard.color: Color
+    @Composable get() {
+        return when (this) {
+            is CustomCard.NoblePhantasm -> Color(0xFFBCC7F8)
+            is CustomCard.AnyFace -> Color(0xFFFFCB9B)
+            is CustomCard.Face -> colorResource(
+                when (type) {
+                    CardTypeEnum.Buster -> R.color.colorBuster
+                    CardTypeEnum.Arts -> R.color.colorArts
+                    CardTypeEnum.Quick -> R.color.colorQuick
+                    else -> R.color.colorAccent
+                }
+            )
+        }
+    }
+
+@Composable
+private fun CustomCardSelectionSummary(customCardSelection: CustomCardSelectionPerTurn) {
+    val hasConfiguredCombination = customCardSelection.any { wave ->
+        wave.any { turn -> turn.any { it.isNotEmpty() } }
+    }
+    if (!hasConfiguredCombination) {
+        Text("Not Set")
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .padding(vertical = 5.dp)
+    ) {
+        customCardSelection.forEachIndexed { waveIndex, wave ->
+            wave.forEachIndexed { turnIndex, candidates ->
+                val configured = candidates.filter { it.isNotEmpty() }
+                if (configured.isEmpty()) return@forEachIndexed
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "W${waveIndex + 1} / T${turnIndex + 1}: ",
+                        modifier = Modifier
+                            .padding(end = 16.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        val summary = buildAnnotatedString {
+                            configured.forEachIndexed { candidateIndex, selection ->
+                                if (candidateIndex != 0) append("  |  ")
+                                selection.forEachIndexed { cardIndex, customCard ->
+                                    if (cardIndex != 0) append(", ")
+                                    withStyle(
+                                        SpanStyle(
+                                            color = customCard.color,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    ) {
+                                        append(customCard.toString())
+                                    }
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = summary,
+                            modifier = Modifier.padding(horizontal = 5.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun CardPrioritySummary(cardPriority: CardPriorityPerWave) {

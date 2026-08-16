@@ -22,6 +22,8 @@ class MoreOptionsViewModel @Inject constructor(
 ) : ViewModel() {
     val storageSummary: MutableState<String?> = mutableStateOf(null)
     val extractSummary: MutableState<String> = mutableStateOf("")
+    val questImages: List<String>
+        get() = runCatching { storageProvider.listQuestImages() }.getOrDefault(emptyList())
 
     init {
         storageSummary.value = storageProvider.rootDirName

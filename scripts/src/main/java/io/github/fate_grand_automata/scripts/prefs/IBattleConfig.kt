@@ -7,6 +7,8 @@ import io.github.fate_grand_automata.scripts.enums.ShuffleCardsEnum
 import io.github.fate_grand_automata.scripts.models.CardPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
+import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+import io.github.fate_grand_automata.scripts.models.MasterSpamConfig
 
 interface IBattleConfig {
     val id: String
@@ -22,8 +24,13 @@ interface IBattleConfig {
     val support: ISupportPreferences
     val shuffleCards: ShuffleCardsEnum
     val shuffleCardsWave: Int
+    val hakunoShuffleEnabled: Boolean
+    val hakunoShuffleAutoDetect: Boolean
+    val hakunoShuffleManualSlot: Int
+    val hakunoShuffleWaves: Set<Int>
 
     var spam: List<ServantSpamConfig>
+    var masterSpam: MasterSpamConfig
     val autoChooseTarget: Boolean
 
     val server: GameServer?
@@ -31,6 +38,7 @@ interface IBattleConfig {
     val addRaidTurnDelay: Boolean
     val raidTurnDelaySeconds : Int
 
+    val customCardSelection: CustomCardSelectionPerTurn
     fun export(): Map<String, *>
 
     fun import(map: Map<String, *>)

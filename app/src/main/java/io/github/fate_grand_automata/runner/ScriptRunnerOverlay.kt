@@ -6,6 +6,7 @@ import android.graphics.PixelFormat
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.compose.ui.platform.ComposeView
 import dagger.hilt.android.scopes.ServiceScoped
 import io.github.fate_grand_automata.di.script.ScriptComponentBuilder
@@ -18,6 +19,7 @@ import io.github.fate_grand_automata.util.DisplayHelper
 import io.github.fate_grand_automata.util.FakedComposeView
 import io.github.fate_grand_automata.util.ScriptState
 import io.github.fate_grand_automata.util.overlayType
+import io.github.fate_grand_automata.util.showOverlayDialog
 import io.github.lib_automata.Location
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -34,6 +36,12 @@ class ScriptRunnerOverlay @Inject constructor(
     private val screenshotServiceHolder: ScreenshotServiceHolder,
     private val scriptComponentBuilder: ScriptComponentBuilder
 ) {
+    private companion object {
+        // Process-lifetime state: background/foreground changes and service recreation do
+        // not show the warning again; an actual application process cold-start resets it.
+        var autoDreamFireWarningHandled = false
+    }
+
     private val layout: ComposeView
 
     private val scriptCtrlBtnLayoutParams = WindowManager.LayoutParams().apply {
@@ -101,7 +109,6 @@ class ScriptRunnerOverlay @Inject constructor(
     }
 
     private var shown = false
-
     fun show() {
         if (!shown && Settings.canDrawOverlays(service)) {
             restorePlayButtonLocation()
@@ -144,8 +151,10 @@ class ScriptRunnerOverlay @Inject constructor(
 
             ScriptRunnerUIAction.Start -> {
                 if (scriptManager.scriptState is ScriptState.Stopped) {
-                    screenshotServiceHolder.screenshotService?.let {
-                        scriptManager.startScript(service, it, scriptComponentBuilder)
+                    if (prefsCore.autoDreamFireEnabled.get() && !autoDreamFireWarningHandled) {
+                        showAutoDreamFireWarning()
+                    } else {
+                        startScript()
                     }
                 }
             }
@@ -160,5 +169,42 @@ class ScriptRunnerOverlay @Inject constructor(
                 scriptManager.showStatus(action.status)
             }
         }
+    }
+
+    private fun startScript() {
+        screenshotServiceHolder.screenshotService?.let {
+            scriptManager.startScript(service, it, scriptComponentBuilder)
+        }
+    }
+
+    private fun showAutoDreamFireWarning() {
+        if (autoDreamFireWarningHandled) return
+
+        autoDreamFireWarningHandled = true
+        val dialog = showOverlayDialog(service) {
+            setTitle(service.getString(io.github.fate_grand_automata.R.string.auto_dream_fire_start_warning_title))
+            setMessage(service.getString(io.github.fate_grand_automata.R.string.auto_dream_fire_start_warning_message))
+            setCancelable(false)
+            setPositiveButton(io.github.fate_grand_automata.R.string.auto_dream_fire_start_warning_yes) { dialog, _ ->
+                prefsCore.autoDreamFireEnabled.set(false)
+                Toast.makeText(
+                    service,
+                    io.github.fate_grand_automata.R.string.auto_dream_fire_disabled_feedback,
+                    Toast.LENGTH_SHORT
+                ).show()
+                dialog.dismiss()
+                layout.post { startScript() }
+            }
+            setNegativeButton(io.github.fate_grand_automata.R.string.auto_dream_fire_start_warning_no) { dialog, _ ->
+                Toast.makeText(
+                    service,
+                    io.github.fate_grand_automata.R.string.auto_dream_fire_enabled_feedback,
+                    Toast.LENGTH_SHORT
+                ).show()
+                dialog.dismiss()
+                layout.post { startScript() }
+            }
+        }
+        dialog.setCanceledOnTouchOutside(false)
     }
 }

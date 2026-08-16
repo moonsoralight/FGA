@@ -67,7 +67,7 @@ private fun MoreOptionsContent(
                     ) {
                         when (it) {
                             MoreSettingsGroup.Battle -> {
-                                battleGroup(vm.prefsCore)
+                                battleGroup(vm.prefsCore, vm.questImages)
                             }
 
                             MoreSettingsGroup.Storage -> {
