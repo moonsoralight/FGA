@@ -10,6 +10,7 @@ import io.github.fate_grand_automata.scripts.models.battle.BattleState
 import io.github.fate_grand_automata.scripts.prefs.IBattleConfig
 import io.github.lib_automata.dagger.ScriptScope
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 @ScriptScope
@@ -27,6 +28,10 @@ class Battle @Inject constructor(
     private val autoChooseTarget: AutoChooseTarget,
     private val hakunoShuffle: HakunoShuffle
 ) : IFgoAutomataApi by api {
+    private var battleTailReached = false
+    private var battleEndDialogueHandled = false
+    private var preBattleDialogueEnabled = true
+
     init {
         prefs.stopAfterThisRun = false
         state.markStartTime()
@@ -35,6 +40,12 @@ class Battle @Inject constructor(
     }
 
     fun resetState() {
+        battleTailReached = false
+        battleEndDialogueHandled = false
+        // A new quest may have a pre-battle dialogue again. This is the only
+        // place that re-enables the bronze-chest branch for the next battle.
+        preBattleDialogueEnabled = true
+
         // Don't increment no. of runs if we're just clicking on quest again and again
         // This can happen due to lags introduced during some events
         if (state.stage != -1) {
@@ -55,6 +66,32 @@ class Battle @Inject constructor(
 
     fun isIdle() = images[Images.BattleScreen] in locations.battle.screenCheckRegion
 
+    fun isPreBattleDialogue() =
+        preBattleDialogueEnabled &&
+                !isIdle() &&
+                locations.battle.battleStartChestRegion.exists(images[Images.BattleStartChest])
+
+    fun advancePreBattleDialogue() {
+        // Perform exactly one safe-area click and return to AutoBattle's original
+        // screen dispatcher. The next dispatcher cycle checks battle.png first;
+        // once it appears, the chest branch stops immediately and performBattle()
+        // starts through the unchanged original path.
+        locations.battle.battleDialogueAdvanceRegion.center.click()
+    }
+
+    fun isPostBattleDialogue() =
+        battleTailReached &&
+                !battleEndDialogueHandled &&
+                locations.battle.battleEndZeroEnemyRegion.exists(images[Images.BattleEndZeroEnemy])
+
+    fun advancePostBattleDialogue() {
+        battleEndDialogueHandled = true
+        locations.battle.battleDialogueAdvanceRegion.center.clickWithInterval(
+            times = prefs.battleEndClickCount,
+            interval = 330.milliseconds
+        )
+    }
+
     fun clickAttack(): List<ParsedCard> {
         locations.battle.attackClick.click()
 
@@ -67,6 +104,10 @@ class Battle @Inject constructor(
     }
 
     fun performBattle() {
+        // battle.png is the sole formal battle-entry marker. Once the original
+        // battle path starts, the pre-battle dialogue branch stays disabled for
+        // the rest of this quest and is re-enabled only by resetState().
+        preBattleDialogueEnabled = false
         prefs.waitBeforeTurn.wait()
 
         onTurnStarted()
@@ -88,6 +129,10 @@ class Battle @Inject constructor(
             ?: shuffleCards()
 
         card.clickCommandCards(cards, npUsage)
+
+        if (autoSkill.isLastConfiguredTurn(state.stage, state.turn)) {
+            battleTailReached = true
+        }
 
         0.5.seconds.wait()
     }

@@ -29,7 +29,7 @@ interface IPreferences {
     val dreamFireBondWaitSeconds: Int
     val dreamFireLevel1Image: String
     val dreamFireLevel2Image: String
-    val dreamFireHasMap: Boolean
+    val dreamFireMapImage: String
     var hidePlayButton: Boolean
     val hideSQInAPResources: Boolean
 
@@ -47,6 +47,7 @@ interface IPreferences {
     val stageCounterNew: Boolean
     val waitBeforeTurn: Duration
     val waitBeforeCards: Duration
+    val battleEndClickCount: Int
 
     val support: ISupportPreferencesCommon
     val platformPrefs: PlatformPrefs

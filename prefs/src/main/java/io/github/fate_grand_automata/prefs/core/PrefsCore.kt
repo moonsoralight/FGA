@@ -50,7 +50,7 @@ class PrefsCore @Inject constructor(
     val dreamFireBondWaitSeconds = maker.int("dream_fire_bond_wait_seconds", 3)
     val dreamFireLevel1Image = maker.string("dream_fire_level_1_image")
     val dreamFireLevel2Image = maker.string("dream_fire_level_2_image")
-    val dreamFireHasMap = maker.bool("dream_fire_has_map", true)
+    val dreamFireMapImage = maker.string("dream_fire_map_image")
     val hidePlayButton = maker.bool("hide_play_button")
     val debugMode = maker.bool("debug_mode")
     val autoStartService = maker.bool("auto_start_service")
@@ -77,6 +77,7 @@ class PrefsCore @Inject constructor(
     val clickWaitTime = maker.int("click_wait_time", 300)
     val clickDuration = maker.int("click_duration", 50)
     val clickDelay = maker.int("click_delay", 10)
+    val battleEndClickCount = maker.int("battle_end_click_count", 6)
 
     val swipeWaitTime = maker.int("swipe_wait_time", 700)
     val swipeDuration = maker.int("swipe_duration", 300)

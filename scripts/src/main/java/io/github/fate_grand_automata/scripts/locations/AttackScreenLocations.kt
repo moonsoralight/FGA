@@ -65,12 +65,16 @@ class AttackScreenLocations @Inject constructor(
      * these regions.
      */
     fun npServantMatchRegion(np: CommandCard.NP) = when (np) {
-        CommandCard.NP.A -> Region(-640, 100, 400, 360)
-        CommandCard.NP.B -> Region(-190, 100, 400, 360)
-        CommandCard.NP.C -> Region(270, 100, 420, 360)
+        CommandCard.NP.A -> Region(-550, 190, 220, 180)
+        CommandCard.NP.B -> Region(-100, 190, 220, 180)
+        CommandCard.NP.C -> Region(370, 190, 220, 180)
     }.xFromCenter()
 
-    fun npSupportCheckRegion(np: CommandCard.NP) = npServantMatchRegion(np)
+    fun npSupportCheckRegion(np: CommandCard.NP) = when (np) {
+        CommandCard.NP.A -> Region(-450, 170, 180, 100)
+        CommandCard.NP.B -> Region(0, 170, 180, 100)
+        CommandCard.NP.C -> Region(470, 170, 180, 100)
+    }.xFromCenter()
 
     val backClick =
         (if (isWide)

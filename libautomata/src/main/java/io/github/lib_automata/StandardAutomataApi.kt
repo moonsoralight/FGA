@@ -33,6 +33,9 @@ class StandardAutomataApi @Inject constructor(
 
     override fun Location.click(times: Int) = click(this, times)
 
+    override fun Location.clickWithInterval(times: Int, interval: Duration) =
+        click.withInterval(this, times, interval)
+
     override fun Region.exists(
         image: Pattern,
         timeout: Duration,

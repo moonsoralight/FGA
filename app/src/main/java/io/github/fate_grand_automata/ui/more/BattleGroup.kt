@@ -139,9 +139,11 @@ fun LazyListScope.battleGroup(
     }
 
     item {
-        prefs.dreamFireHasMap.SwitchPreference(
-            title = stringResource(R.string.p_dream_fire_has_map),
-            summary = stringResource(R.string.p_dream_fire_has_map_summary)
+        prefs.dreamFireMapImage.ListPreference(
+            title = stringResource(R.string.p_dream_fire_map_image),
+            entries = listOf("").plus(questImages).associateWith {
+                it.ifBlank { stringResource(R.string.p_not_set) }
+            }
         )
     }
 

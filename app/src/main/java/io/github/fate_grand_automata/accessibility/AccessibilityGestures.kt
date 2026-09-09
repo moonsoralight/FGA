@@ -144,6 +144,24 @@ class AccessibilityGestures @Inject constructor(
         wait(gesturePrefs.clickWaitTime)
     }
 
+    override fun clickWithInterval(location: Location, times: Int, interval: kotlin.time.Duration) = runBlocking {
+        val clickPath = Path().moveTo(location)
+
+        Timber.d("click $location x$times with interval $interval")
+
+        repeat(times.coerceAtLeast(0)) { index ->
+            val stroke = GestureDescription.StrokeDescription(
+                clickPath,
+                if (index == 0) gesturePrefs.clickDelay.inWholeMilliseconds
+                else interval.inWholeMilliseconds,
+                gesturePrefs.clickDuration.inWholeMilliseconds
+            )
+            performGesture(stroke)
+        }
+
+        wait(gesturePrefs.clickWaitTime)
+    }
+
     private suspend fun performGesture(StrokeDesc: GestureDescription.StrokeDescription): Boolean = suspendCancellableCoroutine {
         val gestureDesc = GestureDescription.Builder()
             .addStroke(StrokeDesc)

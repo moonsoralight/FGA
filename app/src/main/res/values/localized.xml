@@ -168,6 +168,7 @@ Copy or rename it if you want to keep it."</string>
     <string name="p_fine_tune_wait_after_clicking">"Wait after clicking"</string>
     <string name="p_fine_tune_click_duration">"Click duration"</string>
     <string name="p_fine_tune_click_delay">"Multi-Click Interval"</string>
+    <string name="p_fine_tune_battle_end_click_count">"Battle-end clicks (times)"</string>
     <string name="p_fine_tune_swipes">"Swipes"</string>
     <string name="p_fine_tune_wait_after_swiping">"Wait after swiping"</string>
     <string name="p_fine_tune_swipe_duration">"Swipe duration"</string>
@@ -527,8 +528,7 @@ After pressing on the button, switch the app filter from \"Not optimized\" to \"
     <string name="p_seconds_unit">seconds</string>
     <string name="p_dream_fire_level1_image">First-level quest entrance</string>
     <string name="p_dream_fire_level2_image">Second-level quest entrance</string>
-    <string name="p_dream_fire_has_map">Quest is on a map</string>
-    <string name="p_dream_fire_has_map_summary">Locate the last-run map marker before confirming the quest.</string>
+    <string name="p_dream_fire_map_image">Map quest feature image</string>
     <string name="p_dream_fire_route">Route after first-level entrance</string>
     <string name="p_dream_fire_route_direct">Locate rotating double-diamond marker</string>
     <string name="p_dream_fire_route_scroll">Scroll to second-level entrance</string>

@@ -23,6 +23,8 @@ interface AutomataApi {
 
     fun Location.click(times: Int = 1)
 
+    fun Location.clickWithInterval(times: Int, interval: Duration)
+
     fun Region.click(times: Int = 1) = center.click(times)
 
     operator fun Region.contains(image: Pattern) = exists(image)

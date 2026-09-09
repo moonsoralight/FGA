@@ -198,6 +198,7 @@ class AutoBattle @Inject constructor(
         // if the validator function evaluates to true, the associated action function is called
         val screens: Map<() -> Boolean, () -> Unit> = mapOf(
             { connectionRetry.needsToRetry() } to { connectionRetry.retry() },
+            { battle.isPostBattleDialogue() } to { battle.advancePostBattleDialogue() },
             { battle.isIdle() } to {
                 storySkipPossible = false
                 if (!isInBattle) {
@@ -205,6 +206,14 @@ class AutoBattle @Inject constructor(
                 }
                 isInBattle = true
                 battle.performBattle()
+            },
+            { battle.isPreBattleDialogue() } to {
+                storySkipPossible = false
+                // A bronze chest without battle.png means that FGO is still in the
+                // pre-battle dialogue phase. Do not mark the run as formally in
+                // battle here: battle.png remains the sole entry condition for the
+                // original performBattle() path above.
+                battle.advancePreBattleDialogue()
             },
             { isInMenu() } to { menu() },
             { isStartingNp() } to { skipNp() },

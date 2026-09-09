@@ -313,8 +313,12 @@ class AutoDreamFire @Inject constructor(
         // map/list load before FGA's ordinary repeated comparison becomes meaningful.
         5.seconds.wait()
         val lastExecutedPattern = images[Images.DreamFireLastExecuted]
-        if (prefs.dreamFireHasMap) {
-            openLastExecutedQuestFromMap(lastExecutedPattern)
+        if (prefs.dreamFireMapImage.isNotBlank()) {
+            val mapPattern = loadStoredQuestPattern(
+                name = prefs.dreamFireMapImage,
+                label = "地图关卡"
+            )
+            openLastExecutedQuestFromMap(mapPattern, lastExecutedPattern)
         } else {
             5.seconds.wait()
             waitFor(
@@ -334,8 +338,10 @@ class AutoDreamFire @Inject constructor(
      * The following three seconds are completely silent; only then may "last executed" be
      * checked. A missing confirmation restarts the whole marker check/click cycle.
      */
-    private fun openLastExecutedQuestFromMap(lastExecutedPattern: Pattern) {
-        val mapPattern = images[Images.DreamFireLastMapMarker]
+    private fun openLastExecutedQuestFromMap(
+        mapPattern: Pattern,
+        lastExecutedPattern: Pattern
+    ) {
         var mapWasClicked = false
 
         repeat(MAX_CLICK_ATTEMPTS) {
@@ -426,10 +432,7 @@ class AutoDreamFire @Inject constructor(
         label: String,
         searchRegion: Region
     ) {
-        val pattern = runCatching {
-            images.loadQuestPattern(name, scale.screenToImage ?: Scale.NoScaling)
-        }
-            .getOrElse { throw Failure("无法读取${label}图片：$name") }
+        val pattern = loadStoredQuestPattern(name, label)
 
         findWithListResetAndUpwardSwipes(
             region = searchRegion,
@@ -445,6 +448,15 @@ class AutoDreamFire @Inject constructor(
             similarity = 0.70
         )
     }
+
+    /**
+     * All user-supplied access/ images share one loading path. The image loader uses the live
+     * script screenshot scale, so entrance and map templates are normalized identically for the
+     * current device before any grayscale comparison is attempted.
+     */
+    private fun loadStoredQuestPattern(name: String, label: String): Pattern = runCatching {
+        images.loadQuestPattern(name, scale.screenToImage ?: Scale.NoScaling)
+    }.getOrElse { throw Failure("无法读取${label}图片：$name") }
 
     /**
      * User entrance lists are first normalized to their top with three downward swipes. Every

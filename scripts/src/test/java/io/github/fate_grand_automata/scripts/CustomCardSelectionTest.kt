@@ -182,6 +182,67 @@ class CustomCardSelectionTest {
         assertNull(matcher.pick(cards, turn = 1))
     }
 
+    @Test
+    fun unavailableNpRejectsCandidateAndContinuesWithNextCandidate() {
+        val config = CustomCardSelectionPerTurn.from(
+            listOf(
+                CustomCardSelection.of("N3+B1+B2"),
+                CustomCardSelection.of("A1+A2+Q3")
+            )
+        )
+        val matcher = ApplyCustomCardSelection(config)
+
+        val withoutN3 = matcher.pick(
+            cards = cards,
+            wave = 1,
+            turn = 1,
+            availableNps = emptySet()
+        )!!
+        assertEquals(1, withoutN3.candidateIndex)
+        assertEquals(
+            listOf(CommandCard.Face.B, CommandCard.Face.C, CommandCard.Face.D),
+            withoutN3.commands
+        )
+
+        val withN3 = matcher.pick(
+            cards = cards,
+            wave = 1,
+            turn = 1,
+            availableNps = setOf(CommandCard.NP.C)
+        )!!
+        assertEquals(0, withN3.candidateIndex)
+        assertEquals(
+            listOf(CommandCard.NP.C, CommandCard.Face.A, CommandCard.Face.E),
+            withN3.commands
+        )
+    }
+
+    @Test
+    fun eachNpRequirementOnlyAcceptsItsOwnAvailablePosition() {
+        CommandCard.NP.list.forEachIndexed { index, requiredNp ->
+            val matcher = matcher("N${index + 1}")
+            val wrongNps = CommandCard.NP.list.toSet() - requiredNp
+
+            assertNull(
+                matcher.pick(
+                    cards = cards,
+                    wave = 1,
+                    turn = 1,
+                    availableNps = wrongNps
+                )
+            )
+            assertEquals(
+                listOf(requiredNp),
+                matcher.pick(
+                    cards = cards,
+                    wave = 1,
+                    turn = 1,
+                    availableNps = setOf(requiredNp)
+                )!!.commands
+            )
+        }
+    }
+
     private fun matcher(raw: String) = ApplyCustomCardSelection(
         CustomCardSelectionPerTurn.from(listOf(CustomCardSelection.of(raw)))
     )

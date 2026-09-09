@@ -20,6 +20,14 @@ class AutoSkillCommand private constructor(
         return emptyList()
     }
 
+    fun isLastConfiguredTurn(stage: Int, turn: Int): Boolean {
+        val lastStage = stages.indexOfLast { wave -> wave.any { it.isNotEmpty() } }
+        if (lastStage < 0 || stage != lastStage) return false
+
+        val lastTurn = stages[lastStage].indexOfLast { it.isNotEmpty() }
+        return turn == lastTurn
+    }
+
     companion object {
 
         // Prepare the list of special targets

@@ -88,6 +88,13 @@ class FineTuneSettingsViewModel @Inject constructor(
                     valueRange = 0..50,
                     valueRepresentation = { "${it}ms" },
                     hint = "Delay between individual taps/clicks when doing so repeatedly like at the end of battles, friend point summon and lottery script."
+                ),
+                FineTuneItem(
+                    pref = prefs.battleEndClickCount,
+                    name = R.string.p_fine_tune_battle_end_click_count,
+                    icon = icon(R.drawable.ic_click),
+                    valueRange = 0..10,
+                    hint = "Number of dialogue-advance taps after the configured final battle turn reaches zero enemies."
                 )
             )
         ),

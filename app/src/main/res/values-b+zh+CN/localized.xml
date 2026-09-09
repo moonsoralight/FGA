@@ -167,6 +167,7 @@
     <string name="p_fine_tune_wait_after_clicking">"点击后暂停（ms）"</string>
     <string name="p_fine_tune_click_duration">"点击时间（ms）"</string>
     <string name="p_fine_tune_click_delay">"双击间隔（ms）"</string>
+    <string name="p_fine_tune_battle_end_click_count">"战斗结束后进行点击（次）"</string>
     <string name="p_fine_tune_swipes">"滑动"</string>
     <string name="p_fine_tune_wait_after_swiping">"滑动后暂停（ms）"</string>
     <string name="p_fine_tune_swipe_duration">"滑动时间（ms）"</string>
@@ -517,8 +518,7 @@
     <string name="p_seconds_unit">秒</string>
     <string name="p_dream_fire_level1_image">一级关卡入口图片</string>
     <string name="p_dream_fire_level2_image">二级关卡入口图片</string>
-    <string name="p_dream_fire_has_map">有无地图</string>
-    <string name="p_dream_fire_has_map_summary">开启时先在地图中寻找“上一次”关卡标记；关闭时直接确认关卡。</string>
+    <string name="p_dream_fire_map_image">地图关卡特征图</string>
     <string name="p_dream_fire_route">进入一级入口后的路径</string>
     <string name="p_dream_fire_route_direct">寻找旋转双菱形定位标志</string>
     <string name="p_dream_fire_route_scroll">滑动寻找二级入口</string>

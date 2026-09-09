@@ -90,7 +90,7 @@ class PreferencesImpl @Inject constructor(
     override val dreamFireBondWaitSeconds by prefs.dreamFireBondWaitSeconds
     override val dreamFireLevel1Image by prefs.dreamFireLevel1Image
     override val dreamFireLevel2Image by prefs.dreamFireLevel2Image
-    override val dreamFireHasMap by prefs.dreamFireHasMap
+    override val dreamFireMapImage by prefs.dreamFireMapImage
 
     override var hidePlayButton by prefs.hidePlayButton
 
@@ -103,6 +103,8 @@ class PreferencesImpl @Inject constructor(
     override val waitBeforeTurn by prefs.waitBeforeTurn.map { it.milliseconds }
 
     override val waitBeforeCards by prefs.waitBeforeCards.map { it.milliseconds }
+
+    override val battleEndClickCount by prefs.battleEndClickCount
 
     override var maxGoldEmberStackSize by prefs.maxGoldEmberSetSize
 

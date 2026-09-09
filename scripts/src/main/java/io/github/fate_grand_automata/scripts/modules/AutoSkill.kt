@@ -37,4 +37,7 @@ class AutoSkill @Inject constructor(
 
         return npUsage
     }
+
+    fun isLastConfiguredTurn(stage: Int, turn: Int) =
+        skillCommand.isLastConfiguredTurn(stage, turn)
 }

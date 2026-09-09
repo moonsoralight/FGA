@@ -1,5 +1,7 @@
 package io.github.lib_automata
 
+import kotlin.time.Duration
+
 /**
  * Interface for classes which can perform gestures.
  */
@@ -19,4 +21,7 @@ interface GestureService : AutoCloseable {
      * @param times the number of times to click
      */
     fun click(location: Location, times: Int = 1)
+
+    /** Clicks repeatedly with a fixed delay before every click after the first one. */
+    fun clickWithInterval(location: Location, times: Int, interval: Duration)
 }

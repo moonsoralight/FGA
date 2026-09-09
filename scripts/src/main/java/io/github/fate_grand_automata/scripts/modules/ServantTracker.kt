@@ -262,7 +262,7 @@ class ServantTracker @Inject constructor(
                         .orEmpty()
                         .maxOfOrNull { image ->
                             locations.attack.npServantMatchRegion(np)
-                                .find(image, 0.5)?.score ?: 0.0
+                                .find(image)?.score ?: 0.0
                         }
                         ?.let { it > 0.0 }
                         ?: false

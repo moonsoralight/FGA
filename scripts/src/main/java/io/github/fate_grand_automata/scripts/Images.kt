@@ -2,6 +2,8 @@ package io.github.fate_grand_automata.scripts
 
 enum class Images(val path: String) {
     BattleScreen("battle.png"),
+    BattleStartChest("battle_start_chest.png"),
+    BattleEndZeroEnemy("battle_end_zero_enemy.png"),
     ServantExist("servant_exist.png"),
     TargetDanger("target_danger.png"),
     TargetServant("target_servant.png"),
@@ -114,6 +116,5 @@ enum class Images(val path: String) {
     DreamFireTerminal("dream_fire_terminal.png"),
     DreamFireNotification("dream_fire_notification.png"),
     DreamFireScrollThumbTip("dream_fire_scroll_thumb_tip.png"),
-    DreamFireLastMapMarker("dream_fire_last_map_marker.png"),
     DreamFireLastExecuted("dream_fire_last_executed.png"),
 }

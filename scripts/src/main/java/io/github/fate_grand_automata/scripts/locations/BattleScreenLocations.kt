@@ -138,4 +138,23 @@ class BattleScreenLocations @Inject constructor(
     val servantDetailsFaceCardRegion = Region(-685, 410, 110, 60).xFromCenter()
 
     val battleSafeMiddleOfScreenClick = Location(0, 550).xFromCenter()
+
+    /**
+     * Exact blue-box area from the 2736x1264 reference image, converted by height
+     * to FGA's 2560x1440 script coordinate system.
+     * Source: x=2124..2206, y=0..80 (83x81).
+     */
+    val battleStartChestRegion = Region(-697, 0, 95, 92).xFromRight()
+
+    /**
+     * Exact blue-box area around the final enemy-count digit.
+     * Source: x=2042..2101, y=71..144 (60x74) at 2736x1264.
+     */
+    val battleEndZeroEnemyRegion = Region(-791, 81, 68, 84).xFromRight()
+
+    /**
+     * Exact purple safe-click box from the 2736x1264 reference image.
+     * Source: x=1673..2139, y=331..659 (467x329).
+     */
+    val battleDialogueAdvanceRegion = Region(347, 377, 532, 375).xFromCenter()
 }
