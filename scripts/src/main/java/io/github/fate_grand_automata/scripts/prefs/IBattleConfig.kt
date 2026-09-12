@@ -9,11 +9,14 @@ import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
 import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
 import io.github.fate_grand_automata.scripts.models.MasterSpamConfig
+import io.github.fate_grand_automata.scripts.models.EnemyMode
 
 interface IBattleConfig {
     val id: String
     var name: String
     var skillCommand: String
+    // Zero-based Wave order. An unconfigured Wave uses Three, not the last mode.
+    var enemyModes: List<EnemyMode>
     var cardPriority: CardPriorityPerWave
     val useServantPriority: Boolean
     val servantPriority: ServantPriorityPerWave

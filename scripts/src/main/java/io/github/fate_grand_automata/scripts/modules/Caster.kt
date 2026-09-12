@@ -6,6 +6,8 @@ import io.github.fate_grand_automata.scripts.enums.SpamEnum
 import io.github.fate_grand_automata.scripts.models.AutoSkillAction
 import io.github.fate_grand_automata.scripts.models.CommandCard
 import io.github.fate_grand_automata.scripts.models.EnemyTarget
+import io.github.fate_grand_automata.scripts.models.EnemyMode
+import io.github.fate_grand_automata.scripts.prefs.IBattleConfig
 import io.github.fate_grand_automata.scripts.models.FieldSlot
 import io.github.fate_grand_automata.scripts.models.ServantTarget
 import io.github.fate_grand_automata.scripts.models.Skill
@@ -20,7 +22,8 @@ import kotlin.time.Duration.Companion.seconds
 class Caster @Inject constructor(
     api: IFgoAutomataApi,
     private val state: BattleState,
-    private val servantTracker: ServantTracker
+    private val servantTracker: ServantTracker,
+    private val battleConfig: IBattleConfig
 ) : IFgoAutomataApi by api {
     private var skillConfirmation: Boolean? = null
 
@@ -170,7 +173,8 @@ class Caster @Inject constructor(
     }
 
     fun selectEnemyTarget(enemy: EnemyTarget) {
-        locations.battle.locate(enemy).click()
+        val mode = battleConfig.enemyModes.getOrNull(state.stage) ?: EnemyMode.Three
+        locations.battle.locateManualEnemy(enemy, mode).click()
 
         0.5.seconds.wait()
 

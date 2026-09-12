@@ -35,7 +35,7 @@ class AutoChooseTarget @Inject constructor(
         // where(Servant 3) is the most powerful one. see docs/ boss_stage.png
         // that's why the table is iterated backwards.
 
-        val dangerTarget = EnemyTarget.list
+        val dangerTarget = EnemyTarget.autoChooseTargets
             .lastOrNull { isPriorityTarget(it) }
 
         if (dangerTarget != null && state.chosenTarget != dangerTarget) {

@@ -16,6 +16,7 @@ import io.github.fate_grand_automata.scripts.models.ServantPriorityPerWave
 import io.github.fate_grand_automata.scripts.models.ServantSpamConfig
 import io.github.fate_grand_automata.scripts.models.MasterSpamConfig
 import io.github.fate_grand_automata.scripts.models.CustomCardSelectionPerTurn
+import io.github.fate_grand_automata.scripts.models.EnemyMode
 
 class BattleConfigCore(
     val id: String,
@@ -37,6 +38,18 @@ class BattleConfigCore(
 
     val name = maker.string("autoskill_name", "--")
     val skillCommand = maker.string("autoskill_cmd")
+    val enemyModes = maker.serialized(
+        "autoskill_enemy_modes",
+        serializer = object : Serializer<List<EnemyMode>> {
+            override fun deserialize(serialized: String) =
+                if (serialized.isBlank()) emptyList()
+                else serialized.split(",").map { EnemyMode.fromCount(it.toIntOrNull()) }
+
+            override fun serialize(value: List<EnemyMode>) =
+                value.joinToString(",") { it.count.toString() }
+        },
+        default = emptyList()
+    )
     val notes = maker.string("autoskill_notes")
 
     val cardPriority = maker.serialized(

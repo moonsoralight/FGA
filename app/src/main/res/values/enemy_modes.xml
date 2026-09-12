@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="skill_maker_enemy_mode_three">3敌人模式</string>
+    <string name="skill_maker_enemy_mode_six">6敌人模式</string>
+    <string name="skill_maker_enemy_mode_changed">由于切换本面敌人模式，请重新设置本面选择的目标敌人，这不会影响其他面设置的敌人模式</string>
+</resources>

@@ -13,6 +13,7 @@ internal class BattleConfig(
 
     override var name by prefs.name
     override var skillCommand by prefs.skillCommand
+    override var enemyModes by prefs.enemyModes
 
     override var cardPriority by prefs.cardPriority
 

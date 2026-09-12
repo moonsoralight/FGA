@@ -2,6 +2,7 @@ package io.github.fate_grand_automata.scripts.locations
 
 import io.github.fate_grand_automata.scripts.enums.GameServer
 import io.github.fate_grand_automata.scripts.models.EnemyTarget
+import io.github.fate_grand_automata.scripts.models.EnemyMode
 import io.github.fate_grand_automata.scripts.models.FieldSlot
 import io.github.fate_grand_automata.scripts.models.OrderChangeMember
 import io.github.fate_grand_automata.scripts.models.ServantTarget
@@ -53,16 +54,21 @@ class BattleScreenLocations @Inject constructor(
         Skill.Servant.C3 -> 1770
     }.let { x -> Location(x + if (isWide) 108 else 0, if (isWide) 1117 else 1158) }
 
+    fun locateManualEnemy(enemy: EnemyTarget, mode: EnemyMode) =
+        ManualEnemyTargetLocations.locate(enemy, mode, isWide)
+
     fun locate(enemy: EnemyTarget) = when (enemy) {
         EnemyTarget.A -> 90
         EnemyTarget.B -> 570
         EnemyTarget.C -> 1050
+        else -> error("Automatic targeting only supports its original three positions")
     }.let { x -> Location(x + if (isWide) 183 else 0, 80) }
 
     fun dangerRegion(enemy: EnemyTarget) = when (enemy) {
         EnemyTarget.A -> Region(0, 0, 485, 220)
         EnemyTarget.B -> Region(485, 0, 482, 220)
         EnemyTarget.C -> Region(967, 0, 476, 220)
+        else -> error("Automatic targeting only supports its original three regions")
     } + Location(if (isWide) 150 else 0, 0)
 
     val screenCheckRegion =

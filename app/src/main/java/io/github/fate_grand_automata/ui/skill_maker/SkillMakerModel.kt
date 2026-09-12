@@ -40,6 +40,21 @@ class SkillMakerModel(skillString: String) {
         .let { listOf(SkillMakerEntry.Start) + it }
         .toMutableStateList()
 
+    /** One-based Wave at the insertion cursor, including a selected Wave separator. */
+    fun waveAt(index: Int) = skillCommand.take(index + 1).count { it is SkillMakerEntry.Next.Wave } + 1
+
+    /** Remove only explicit targets in one Wave, preserving every separator and other action. */
+    fun removeEnemyTargets(wave: Int, cursor: Int): Pair<Int, Boolean> {
+        var entryWave = 1
+        val removed = skillCommand.indices.filter { index ->
+            val entry = skillCommand[index]
+            if (entry is SkillMakerEntry.Next.Wave) ++entryWave
+            entryWave == wave && entry is SkillMakerEntry.Action && entry.action is AutoSkillAction.TargetEnemy
+        }
+        removed.asReversed().forEach { skillCommand.removeAt(it) }
+        return (cursor - removed.count { it <= cursor }) to removed.isNotEmpty()
+    }
+
     override fun toString(): String {
         fun getSkillCmd(): List<SkillMakerEntry> {
             if (skillCommand.isNotEmpty()) {

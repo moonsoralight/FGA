@@ -43,7 +43,7 @@ android {
         minSdk = 24
         targetSdk = 35
         versionCode = System.getenv("FGA_VERSION_CODE")?.toInt() ?: 1
-        versionName = System.getenv("FGA_VERSION_NAME") ?: System.getenv("FGA_VERSION_CODE") ?: "0.1.0"
+        versionName = System.getenv("FGA_VERSION_NAME") ?: "0.1.2"
     }
 
     signingConfigs {

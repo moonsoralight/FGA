@@ -118,6 +118,7 @@ fun SkillMakerUI(
                     onClear = { clearConfirmDialog.show() },
                     onDone = {
                         vm.battleConfig.skillCommand = vm.finish()
+                        vm.battleConfig.enemyModes = vm.finishedEnemyModes()
                         exit()
                     }
                 )

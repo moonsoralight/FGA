@@ -3,11 +3,13 @@ package io.github.fate_grand_automata.ui.skill_maker
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.toMutableStateList
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.fate_grand_automata.scripts.models.AutoSkillAction
 import io.github.fate_grand_automata.scripts.models.EnemyTarget
+import io.github.fate_grand_automata.scripts.models.EnemyMode
 import io.github.fate_grand_automata.scripts.models.OrderChangeMember
 import io.github.fate_grand_automata.scripts.models.ServantTarget
 import io.github.fate_grand_automata.scripts.models.Skill
@@ -74,14 +76,41 @@ class SkillMakerViewModel @Inject constructor(
 
     private var currentSkill = state.currentSkill
 
+    private val enemyModes = (state.enemyModeCounts?.map { EnemyMode.fromCount(it) }
+        ?: battleConfig.enemyModes).toMutableStateList()
+
+    val enemyMode: EnemyMode
+        get() = enemyModes.getOrNull(model.waveAt(currentIndex.value) - 1) ?: EnemyMode.Three
+
+    private fun ensureEnemyModes() {
+        val count = model.skillCommand.count { it is SkillMakerEntry.Next.Wave } + 1
+        while (enemyModes.size < count) enemyModes.add(EnemyMode.Three)
+    }
+
+    fun finishedEnemyModes(): List<EnemyMode> = enemyModes.toList()
+
+    /** Returns true only when this actual mode change removed explicit targets. */
+    fun setEnemyMode(mode: EnemyMode): Boolean {
+        if (mode == enemyMode) return false
+        ensureEnemyModes()
+        val currentWave = model.waveAt(currentIndex.value)
+        enemyModes[currentWave - 1] = mode
+        val (newIndex, removed) = model.removeEnemyTargets(currentWave, currentIndex.value)
+        _currentIndex.value = newIndex
+        unSelectTargets()
+        return removed
+    }
+
     fun saveState() {
         val saveState = SkillMakerSavedState(
-            skillString = model.toString(),
+            // Keep editor separators, including an empty final Wave, with their mode indices.
+            skillString = model.skillCommand.joinToString(""),
             enemyTarget = enemyTarget.value,
             wave = wave.value,
             turn = turn.value,
             currentSkill = currentSkill,
-            currentIndex = currentIndex.value
+            currentIndex = currentIndex.value,
+            enemyModeCounts = enemyModes.map { it.count }
         )
 
         savedState[::savedState.name] = saveState
@@ -99,6 +128,9 @@ class SkillMakerViewModel @Inject constructor(
 
     fun setCurrentIndex(index: Int) {
         _currentIndex.value = index
+
+        _wave.intValue = model.waveAt(index)
+        _turn.intValue = model.skillCommand.take(index + 1).count { it is SkillMakerEntry.Next } + 1
 
         revertToPreviousEnemyTarget()
     }
@@ -131,6 +163,7 @@ class SkillMakerViewModel @Inject constructor(
     val enemyTarget: State<Int?> = _enemyTarget
 
     fun setEnemyTarget(target: Int?) {
+        require(target == null || target in 1..enemyMode.count)
         _enemyTarget.value = target
 
         if (target == null) {
@@ -217,6 +250,9 @@ class SkillMakerViewModel @Inject constructor(
     }
 
     fun nextWave(atk: AutoSkillAction.Atk) {
+        ensureEnemyModes()
+        // Insert the new Wave's mode at the same position as its separator.
+        enemyModes.add(model.waveAt(currentIndex.value), EnemyMode.Three)
         ++_wave.value
         ++_turn.value
 
@@ -275,6 +311,9 @@ class SkillMakerViewModel @Inject constructor(
             '1' -> 1
             '2' -> 2
             '3' -> 3
+            '4' -> 4
+            '5' -> 5
+            '6' -> 6
             else -> return
         }
 
@@ -284,6 +323,8 @@ class SkillMakerViewModel @Inject constructor(
     private fun deleteStageOrTurn() {
         // Decrement Battle/Turn count
         if (last is SkillMakerEntry.Next.Wave) {
+            ensureEnemyModes()
+            enemyModes.removeAt(model.waveAt(currentIndex.value) - 1)
             prevStage()
             prevTurn()
         }
@@ -303,6 +344,8 @@ class SkillMakerViewModel @Inject constructor(
         while (!isEmpty()) {
             onDeleteSelected()
         }
+        enemyModes.clear()
+        setCurrentIndex(0)
     }
 
     fun onDeleteSelected() {

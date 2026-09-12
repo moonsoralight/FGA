@@ -40,8 +40,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.fate_grand_automata.R
 import io.github.fate_grand_automata.scripts.models.AutoSkillAction
+import io.github.fate_grand_automata.scripts.models.EnemyMode
 import io.github.fate_grand_automata.scripts.models.Skill
 import io.github.fate_grand_automata.ui.icon
+import io.github.fate_grand_automata.ui.dialog.FgaDialog
 
 @Composable
 fun SkillMakerMain(
@@ -53,6 +55,12 @@ fun SkillMakerMain(
     onClear: () -> Unit,
     onDone: () -> Unit
 ) {
+    val enemyModeChangedDialog = FgaDialog()
+    enemyModeChangedDialog.build {
+        message(stringResource(R.string.skill_maker_enemy_mode_changed))
+        buttons(onSubmit = {}, showCancel = false)
+    }
+
     Column(
         modifier = Modifier
             .padding(vertical = 16.dp)
@@ -68,7 +76,11 @@ fun SkillMakerMain(
 
             EnemyTarget(
                 selected = enemyTarget,
-                onSelectedChange = { vm.setEnemyTarget(it) }
+                mode = vm.enemyMode,
+                onSelectedChange = { vm.setEnemyTarget(it) },
+                onModeChange = {
+                    if (vm.setEnemyMode(it)) enemyModeChangedDialog.show()
+                }
             )
 
             Column(
@@ -305,10 +317,42 @@ fun SkillHistory(vm: SkillMakerViewModel) {
 @Composable
 fun EnemyTarget(
     selected: Int?,
+    mode: EnemyMode,
+    onSelectedChange: (Int) -> Unit,
+    onModeChange: (EnemyMode) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            if (mode == EnemyMode.Six) {
+                EnemyTargetRow(listOf(6, 5, 4), selected, onSelectedChange)
+            }
+            EnemyTargetRow(listOf(3, 2, 1), selected, onSelectedChange)
+        }
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            listOf(EnemyMode.Three, EnemyMode.Six).forEach { option ->
+                Row(
+                    modifier = Modifier.clickable { onModeChange(option) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = mode == option, onClick = { onModeChange(option) })
+                    Text(stringResource(
+                        if (option == EnemyMode.Three) R.string.skill_maker_enemy_mode_three
+                        else R.string.skill_maker_enemy_mode_six
+                    ))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EnemyTargetRow(
+    targets: List<Int>,
+    selected: Int?,
     onSelectedChange: (Int) -> Unit
 ) {
     Row {
-        (1..3).map {
+        targets.forEach {
             val isSelected = selected == it
             val onClick = { onSelectedChange(it) }
 
